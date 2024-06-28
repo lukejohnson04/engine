@@ -1,0 +1,264 @@
+:TestEvent
+if count 0
+	say First time running this event.
+	say Line two.
+	return
+if count 1
+	say Second time running this event
+say Wowzers
+
+:mother
+if count 0
+	say Hard to believe that's really her.
+	return
+say Couldn't talk to her even if I wanted to.
+say They don't [y]Know my name[y].
+
+
+:basement_door
+if count 0
+	enter basement
+	return
+say I better not go in there.
+
+
+:kid
+say You ever feel like no matter how hard you try you're always going to fail?
+
+:buskid1
+say Is that seriously what you're wearing??
+say Come on love, put on something less casual.
+
+:sackkid
+say Mom told me if anyone tries to sit next to me to move my sack.
+say I don't think that I want to move my sack for you though.
+
+
+:bus_seat
+say You sit down.
+wait 2
+say The bus keeps going.
+wait 3
+say The bus comes to a stop.
+func boy_enters_bus
+
+:bus_boy_sits_down
+wait 1
+say He sits down.
+wait 1
+say The bus keeps going.
+wait 3
+say Hey.
+wait 1
+say My name's X.
+say What's YOUR name?
+wait 1
+say Hello?
+wait 2
+say Do you ever think about a land of just plants and trees?
+say Just waiting to be explored?
+say Man, there's nothing I want more than a land full of plants and trees, just waiting to be explored!
+say Sometimes I sit and just think to myself... what if instead of being here right now, if it were that instead.
+say But then, I digress.
+say Or do I?
+say ...
+say Are you ever going to fucking say anything?
+wait 3
+say The bus stops.
+fadeout 1
+enter classroom
+
+:cage
+sceneanim 3
+enter outside
+
+:classroom
+wait 1
+fadein 1
+if count 0
+	wait 2
+	say Long ago, before the trees, before the clams beneath the seas, before the petite breeze touching the pearly white gates of heaven.
+	say There once was a boy, who slipped between the cracks.
+	say Slippery slimy, tall but tiny, he weaseled his way right on in there...
+	say One day, the cement truck came and out it trickled down, down, down into the cracks!
+	say Where did the boy go..?
+	fadeout 1
+	enter artroom
+if count 1
+	wait 1
+	say Had he ever even been there..?
+	say There's a method to the madness, there's a method to the sadness
+	say The boy who slipped inside the cracks, it truly is a tale quite tragic.
+	fadeout 1
+	enter artroom
+if count 2
+	wait 1
+	say Long lost love he left behind, left alone in the world above.
+	say Sands of time fill each gap, fill the gaps left by his love.
+	say He made a little home, with the mice and rodents deep down under.
+	say "What's she up to now?" He thought, he couldn't help but wonder.
+	say A force to be reckoned with, he tried to reach the surface. A trek, a voyage, lengthy trail, he knew it would be worth it.
+	fadeout 1
+	enter cafeteria
+if count 3
+	wait 3
+	say Once he got to heaven, he came screaming at the gates. "Oh Grace, oh Grace, my dearest love! Save me from this awful place!"
+	say Not misremembered or forgotten, she saw his face quite clear. All these years and decades gone, and she was still his dear.
+	say No matter of her love for him, all she could do was sit and watch. She couldn't bring him past the gates, nor could she leave the place.
+	say What was her decision? And that of his?
+	say Is there a thing left to be done?
+	say Star crossed paths, together forgotten. Neither matter, but still are lovers.
+	say ...
+	say That's the end of it.
+	say All that's written, at least.
+	say He never finished the story. Couldn't figure out how it ended.
+	wait 1
+	fadeout 5
+	enter cafeteria_full
+
+if count 10
+	wait 3
+	fadein 1
+	wait 1
+	say You are now in the hallway!
+
+// long pause and music tapers off before the final storybook section?
+
+:artroom
+wait 1
+fadein 1
+wait 2
+func art_teacher_walks_in
+
+:cafeteria
+wait 1
+fadein 1
+if count 0
+	wait 2
+	say Is this what you wanted?
+	fadeout 1
+	enter classroom
+if count 1
+	wait 3
+	func boy_enters_cafeteria
+
+:boy_arrives_cafeteria
+wait 2
+say Everybody thinks they know everything.
+say I want you to know that I really do, though. And I mean it.
+say ...
+wait 2
+say You know it never gets any easier than this, right?
+say Think about it.
+wait 1
+fadeout 2
+enter classroom
+
+say It never gets any easier. But it never gets any harder either.
+
+
+:artteacher_comment
+if count 0
+	say Oh my! Well done!
+	say I love the use of red in this one. It really pops!
+if count 1
+	say Great imagery! Feels like my happy place. Man, I wish I could be there!
+if count 2
+	say A happy smile for a happy student!
+	say A painting a day makes you feel extra great! Good work!
+if count 3
+	say ...
+	say Oh my. Oh me oh my!
+	say This is the worst painting I've ever seen.
+	say What is this supposed to be? This is embarrassing.
+	fadeout 1
+	enter cafeteria
+if count 4
+	say Wow! I love the imagery on this one! It's so vivid!
+	say I feel like I'm really there watching Florence drown to death in a puddle of their own tears!
+if count 5
+	say A child with unrestricted internet access. What beautiful commentary on the human condition!
+	say His eyes are REALLY glued to that laptop!
+	say I love the way the canvas is literally bleeding!!!
+if count 6
+	say This is a great step up from last time.
+	say You can really feel the hopelessness of the face after it realizes it is forever trapped inside the painting!
+if count 7
+	say ...
+	say Still needs more work. The text is far too sterile.
+	say Maybe scream it a little louder next time and I might just listen.
+	fadeout 1
+	enter bathroom
+
+:bathroom
+wait 1
+fadein 1
+
+:bathroom_stall
+if count 0
+	wait 2
+	say Is that seriously what you're wearing??
+	say Come on love, put on something less casual.
+	fadeout 3
+	enter classroom
+
+:lizard_boy
+say Hey Florence! It's me, Lizard Boy!
+say I have something I want to give you. It will surely come in handy, I know that for sure.
+say *he hands over a voice recorder*
+say [y]Click[y] on [y]colored[y] words to [y]record[y] it and play it back to the speaker!
+if choice 0
+	say Uhhhhh I mean uhhh [y]focus[y] on the word using your minds eye and then select it!!!!
+	if choice 0
+		say What do you have ADHD or something??
+if choice 1
+	say ... is that not [y]PC[y] to say?
+	if choice 0
+		say Do you have a PC? Do you play a lot of games at home?
+		say ...
+		say I guess there's kind of a limit sometimes on how much information you can convey.
+if choice 2
+	say Yes, record it. You can record words and play them back [y]immediately[y], but you only have [y]five[y] save slots.
+	if choice 0
+		say If you save a word, you can play it back at any point later on. But you have a limited number of these slots, so beware!!!
+	if choice 1
+		say Erm..... what the scallop
+say Yikers
+
+:classroom_real_letter
+say Dear Mrs. B,
+say I'm trying to apply to colleges, but I can't find any that are GPA optional. Please help.
+say I want you to know I'll love you no matter where you go or what you wear or how you feel.
+say Signed, signed, signed. Be mine.
+
+:bell_rings
+say ...
+say It's time.
+wait 1.5
+fadein 0.75
+
+:purse
+say ...
+say A stick of gum, a pack of cigarettes, and a small blue whistle.
+
+:artroom_real_teacher
+if count 0
+	say Enjoy your "break", Florence.
+	say Maybe use the time to take a couple art classes.
+	return
+say Remeber it's an early dismissal day, so there won't be any busses. You'll need your parents to pick you up.
+
+:parent_pickup
+sceneanim 5
+wait 2
+
+:recorder_intro
+say It has three sounds recorded to it already.
+say I like.
+say I don't like.
+say Who are you?
+say Tell me more.
+
+:hammertalk
+say I hate for you to find out like this...
+say [y]But I've been hammering other nails.[y]

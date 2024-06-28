@@ -1,0 +1,7 @@
+openingscene
+centity 48 0 32 720
+centity 0 528 1280 32
+
+outside
+pentity 1880 640 460 32
+centity 2100 400 180 240 enter testroom5

@@ -1,0 +1,7 @@
+/.vscode
+*.flp
+/bin
+/obj
+/build/.vs
+imgui.ini
+/.VSCodeCounter
