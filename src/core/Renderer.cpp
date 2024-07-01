@@ -1,3 +1,6 @@
+
+
+
 #include "Shader.cpp"
 
 const Color COLOR_BLACK = Color(0,0,0,255);
@@ -171,3 +174,75 @@ internal void GL_load_texture(GLuint tex, const char* path) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }
+
+internal void GL_load_texture_from_sdl_surface(GLuint tex,SDL_Surface *tex_surf) {
+    GLenum format = 0, type = GL_UNSIGNED_BYTE; // Default to unsigned byte for type
+
+    switch (tex_surf->format->format) {
+        case SDL_PIXELFORMAT_RGBA8888:
+            format = GL_RGBA;
+            break;
+        case SDL_PIXELFORMAT_ABGR8888:
+            format = GL_BGRA;
+            break;
+        case SDL_PIXELFORMAT_BGRA8888:
+            format = GL_BGRA;
+            break;
+        case SDL_PIXELFORMAT_ARGB8888:
+            format = GL_BGRA;
+            break;
+        case SDL_PIXELFORMAT_RGB888:
+        case SDL_PIXELFORMAT_RGB24:
+            format = GL_RGB;
+            break;
+        case SDL_PIXELFORMAT_BGR888:
+            format = GL_BGR;
+            break;
+        case SDL_PIXELFORMAT_RGB565:
+            format = GL_RGB;
+            type = GL_UNSIGNED_SHORT_5_6_5;
+            break;
+        case SDL_PIXELFORMAT_RGBA4444:
+            format = GL_RGBA;
+            type = GL_UNSIGNED_SHORT_4_4_4_4;
+            break;
+        case SDL_PIXELFORMAT_RGB332:
+            format = GL_RGB;
+            type = GL_UNSIGNED_BYTE_3_3_2;
+            break;
+        default:
+            break;
+    }
+
+    if (format == 0) {
+        std::cerr << "No valid OpenGL format found. Texture creation aborted." << std::endl;
+        return;
+    }
+
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, format == GL_RGB ? GL_RGB8 : GL_RGBA8, tex_surf->w, tex_surf->h, 0, format, type, tex_surf->pixels);
+    glGenerateMipmap(GL_TEXTURE_2D);
+}
+
+
+
+
+internal void generate_text(GLuint tex, TTF_Font *font,std::string str,Color col,i32 wrap) {
+    SDL_Surface* temp_surface =
+        TTF_RenderText_Solid_Wrapped(font, str.c_str(),*(SDL_Color*)&col, wrap);
+    temp_surface = SDL_ConvertSurfaceFormat(temp_surface, SDL_PIXELFORMAT_ARGB8888, 0);
+
+    if (tex != NULL) {
+        glDeleteTextures(1,&tex);
+    }
+    glGenTextures(1,&tex);
+
+    GL_load_texture_from_sdl_surface(tex,temp_surface);
+    
+    SDL_FreeSurface(temp_surface);
+}
+

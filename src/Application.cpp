@@ -1,3 +1,4 @@
+
 #pragma once
 #include <string>
 
@@ -30,8 +31,8 @@ int main() {
 #include <windows.h>
 #include "core/engine.cpp"
 
-#define WINDOW_WIDTH 256
-#define WINDOW_HEIGHT 256
+#define WINDOW_WIDTH 720
+#define WINDOW_HEIGHT 540
 
 
 struct win32_game_code {
@@ -222,6 +223,7 @@ void Application::Run(std::string start_room) {
         if (CompareFileTime(&new_WriteTime, &global_game_code.LastWriteTime) != 0) {
             UnloadGameCode(&global_game_code);
             LoadGameCode(&global_game_code);
+            printf("Reloaded game code\n");
         }
         // events
         PollEvents(input, global_game_code.HandleEvent, &running);

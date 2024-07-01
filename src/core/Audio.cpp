@@ -1,4 +1,6 @@
+
 #pragma once
+
 struct world_sound {
     Resource* res;
     vec2 position;
@@ -17,15 +19,10 @@ struct music_object {
 
 namespace Audio {
     enum {
-        MUSIC_KNOCKING_INTRO,
-        MUSIC_COUNT,
         MUSIC_NONE
     };
 
     enum {
-        CHUNK_NOISE,
-        CHUNK_ILOVEYOU,
-        CHUNK_COUNT,
         CHUNK_NONE
     };
 
