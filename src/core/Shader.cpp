@@ -1,4 +1,5 @@
 
+
 std::string readShaderFile(const std::string &shaderPath) {
     std::ifstream shaderFile;
     std::stringstream shaderStream;
@@ -67,9 +68,28 @@ GLuint createShaderProgram(const std::string& vertexPath, const std::string& fra
 
 struct Shader {
     GLuint id;
-    GLuint Uniform(const GLchar *name) {
+    
+    inline GLuint Uniform(const GLchar *name) {
         return glGetUniformLocation(id, name);
     }
+
+    void Uniform1i(const GLchar *name, GLuint tex) {
+        glBindTexture(GL_TEXTURE_2D,tex);
+        glUniform1i(Uniform(name),0);
+    }
+
+    void UniformM4fv(const GLchar *name, glm::mat4 value) {
+        glUniformMatrix4fv(Uniform(name), 1, GL_FALSE, glm::value_ptr(value));
+    }
+
+    void UniformColor(const GLchar *name, Color color) {
+        glUniform4f(Uniform(name),((float)color.r/255.f),((float)color.g/255.f),((float)color.b/255.f),((float)color.a/255.f));
+    }
+
+    void Uniform4f(const GLchar *name, float a, float b, float c, float d) {
+        glUniform4f(Uniform(name),a,b,c,d);
+    }
+
 };
 
 void UseShader(Shader *shader) {

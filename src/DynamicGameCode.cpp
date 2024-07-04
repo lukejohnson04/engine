@@ -1,6 +1,5 @@
 
 
-
 #include "core/engine.cpp"
 
 #define WINDOW_WIDTH 720
@@ -27,8 +26,19 @@ struct FightChara {
 enum GameMode {
     GM_GOBLINS,
     GM_ROAD_LESS_TRAVELLED,
+    GM_THIRD_WHEEL,
+    GM_DRIVING,
     GM_COUNT
 };
+
+struct Car {
+    v2 pos;
+    float speed=0.f;
+    double angle_body=0.;
+    double turn=0.0;
+    //float angle_wheels=0.f;
+};
+
 
 
 struct GameState {
@@ -42,6 +52,15 @@ struct GameState {
     GLuint forest_texture;
     GLuint std_texture;
     GLuint endings_texture;
+
+    GLuint car_texture;
+    GLuint course_texture;
+    GLuint arrow_texture;
+    Car player_car;
+
+    camera_t camera;
+    
+
     v2i tex_dimensions;
     i32 dialogue_line = -1;
     Mix_Chunk *dialogue;
@@ -104,10 +123,11 @@ void InitializeGameMemory(GameMemory *memory) {
     game_state->colorShader = CreateShader("../src/shaders/color.vert","../src/shaders/color.frag");
     game_state->textureShader = CreateShader("../src/shaders/texture.vert","../src/shaders/texture.frag");
     game_state->projection = glm::ortho(0.0f, static_cast<float>(NATIVE_GAME_WIDTH), static_cast<float>(NATIVE_GAME_HEIGHT), 0.0f, -1.0f, 1.0f);
-    game_state->mode = GM_ROAD_LESS_TRAVELLED;
+    game_state->mode = GM_DRIVING;
     game_state->travelled_state = GameState::POEM_SCROLL;
 
     game_state->player = {};
+    game_state->player_car.pos = {100,800};
 
     glGenTextures(1,&game_state->player_texture);
     GL_load_texture(game_state->player_texture,"res/imgs/guy.png");
@@ -123,7 +143,12 @@ void InitializeGameMemory(GameMemory *memory) {
     GL_load_texture(game_state->endings_texture,"res/imgs/endings.png");
     glGenTextures(1,&game_state->forest_texture);
     GL_load_texture(game_state->forest_texture,"res/imgs/forest.png");
-
+    glGenTextures(1,&game_state->car_texture);
+    GL_load_texture(game_state->car_texture,"res/imgs/car.png");
+    glGenTextures(1,&game_state->course_texture);
+    GL_load_texture(game_state->course_texture,"res/imgs/course.png");
+    glGenTextures(1,&game_state->arrow_texture);
+    GL_load_texture(game_state->arrow_texture,"res/imgs/arrow.png");
 
     game_state->font = TTF_OpenFont("res/fonts/Alkhemikal.ttf",16);
     if (game_state->font == nullptr) {
@@ -184,25 +209,99 @@ GAME_UPDATE_AND_RENDER(GameUpdateAndRender) {
 
             
         } else if (game_state->mode == GM_ROAD_LESS_TRAVELLED) {
-            //if (game_state->travelled_state == GameState::POEM_SCROLL || game_state->travelled_state == GameState::CHOICE_MORE_TRAVELED || game_state->travelled_state == GameState::BAD_ENDING) {
-                game_state->text_scroll_amount += timestep;
+            game_state->text_scroll_amount += timestep;
+        } else if (game_state->mode == GM_DRIVING) {
+            
+
+            double turn_speed = PI * 2.0 * timestep;
+            double turn_stop_speed = PI * 2.0 * timestep;
+            double max_turn_angle = PI * (1.0/2.0);
+            bool drifting = false;
+            
+            if (input->is_pressed[SDL_SCANCODE_D]) {
+                game_state->player_car.turn += turn_speed;
+            } else if (input->is_pressed[SDL_SCANCODE_A]) {
+                game_state->player_car.turn -= turn_speed;
+            } else {
+                if (game_state->player_car.turn > 0.0) {
+                    game_state->player_car.turn -= turn_stop_speed;
+                    if (game_state->player_car.turn < 0.0) {
+                        game_state->player_car.turn = 0.0;
+                    }
+                } else if (game_state->player_car.turn < 0.0) {
+                    game_state->player_car.turn += turn_stop_speed;
+                    if (game_state->player_car.turn > 0.0) {
+                        game_state->player_car.turn = 0.0;
+                    }
+                }
+            }
+
+            game_state->player_car.turn = CLAMP(-max_turn_angle,max_turn_angle,game_state->player_car.turn);
+
+            float acceleration = 110;
+            float friction = 50;
+            float max_speed = 230;
+
+            if (input->is_pressed[SDL_SCANCODE_LSHIFT]) {
+                drifting = true;
+                friction = 0;
+            }
+
+            if (game_state->player_car.speed < max_speed/3) {
+                //acceleration *= 1.65;
+            }// if (abs(game_state->player_car.turn) >= max_turn_angle/3.0) {
+            //friction *= 1+((abs(game_state->player_car.turn) - (max_turn_angle/3.0)) / (max_turn_angle-(max_turn_angle/3.0)));
+                //acceleration *= 0.85;
                 //}
+            if (input->is_pressed[SDL_SCANCODE_W]) {
+                game_state->player_car.speed += acceleration * timestep;
+            }
+            game_state->player_car.speed -= friction * timestep;
+
+            game_state->player_car.speed = CLAMP(0,max_speed,game_state->player_car.speed);
+            
+            //printf("%f\n",game_state->player_car.turn);
+            if (game_state->player_car.turn) {
+                // get point along circle based on speed and turn
+                double wheel_base = 10.0;
+                
+                double turning_radius = wheel_base / (sin(abs(game_state->player_car.turn/2.0)));
+                double percentage_of_circumference = (game_state->player_car.speed*timestep) / (PI*turning_radius*turning_radius);
+                v2 C;
+                float angle_from_circle_to_car;
+                if (game_state->player_car.turn > 0) {
+                    angle_from_circle_to_car = game_state->player_car.angle_body-PI/2.f;
+                    C = game_state->player_car.pos - (angle_to_vec(angle_from_circle_to_car)*turning_radius);
+                } else {
+                    angle_from_circle_to_car = game_state->player_car.angle_body+PI/2.f;
+                    C = game_state->player_car.pos - (angle_to_vec(angle_from_circle_to_car)*turning_radius);
+                }
+                float angle_diff = percentage_of_circumference*PI*2.f;
+                
+                v2 new_point = C + (angle_to_vec(angle_from_circle_to_car+angle_diff)*turning_radius);
+                //game_state->player_car.pos = new_point;
+                float new_angle = angle_from_circle_to_car;
+                if (game_state->player_car.turn > 0) {
+                    new_angle += angle_diff;
+                    new_angle += PI/2.f;
+                } else {
+                    new_angle -= angle_diff;
+                    new_angle -= PI/2.f;
+                }
+                game_state->player_car.angle_body = new_angle;
+            }
+            
+            game_state->player_car.pos += angle_to_vec(game_state->player_car.angle_body) * (game_state->player_car.speed * timestep);
+            //printf("%f\n",game_state->player_car.angle_body);
+            //game_state->player_car.pos -= delta;
         }
     }
     // <----------------------->
     //       RENDER BEGIN
     // <----------------------->
     
-    glClearColor(0.0f, 0.1f, 0.5f, 1.0f);
+    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
-
-    /*
-    UseShader(&game_state->colorShader);
-    glUniformMatrix4fv(game_state->colorShader.Uniform("projection"), 1, GL_FALSE, glm::value_ptr(game_state->projection));
-    glUniform4f(game_state->colorShader.Uniform("color"),1.0f,1.0f,0.0f,1.0f);
-    GL_DrawRect({100,100,100,100});
-    GL_DrawRect({400,100,100,100});
-    */
 
     if (game_state->mode == GM_GOBLINS) {
         UseShader(&game_state->textureShader);
@@ -211,10 +310,40 @@ GAME_UPDATE_AND_RENDER(GameUpdateAndRender) {
         glUniform1i(game_state->textureShader.Uniform("_texture"),0);
         glUniform4f(game_state->textureShader.Uniform("colorMod"),1.0f,1.0f,1.0f,1.0f);
         glUniformMatrix4fv(game_state->textureShader.Uniform("projection"), 1, GL_FALSE, glm::value_ptr(game_state->projection));
-        glm::mat4 model = glm::mat4(1.0f);
-        glUniformMatrix4fv(game_state->textureShader.Uniform("model"), 1, GL_FALSE, glm::value_ptr(model));
+        //glm::mat4 model = glm::mat4(1.0f);
+        game_state->textureShader.UniformM4fv("model",glm::mat4(1.0f));
+        //glUniformMatrix4fv(game_state->textureShader.Uniform("model"), 1, GL_FALSE, glm::value_ptr(model));
 
         GL_DrawTexture({0,0,160,120},{0,0,160,120});
+    } else if (game_state->mode == GM_DRIVING) {
+        game_state->camera.size = {NATIVE_GAME_WIDTH,NATIVE_GAME_HEIGHT};
+        game_state->camera.pos = game_state->player_car.pos;
+        v2i cam_pos = v2i(game_state->camera.get_offset());
+        cam_pos.x *= -1;
+        cam_pos.y *= -1;
+        
+        UseShader(&game_state->textureShader);
+        game_state->textureShader.UniformColor("colorMod",COLOR_WHITE);
+        game_state->textureShader.UniformM4fv("projection",game_state->projection);
+        game_state->textureShader.UniformM4fv("model",glm::mat4(1.0f));
+
+        game_state->textureShader.Uniform1i("_texture",game_state->course_texture);
+        GL_DrawTexture({0,0,960,720},{cam_pos.x,cam_pos.y,960,720});
+        game_state->textureShader.Uniform1i("_texture",game_state->car_texture);
+        iRect p_draw_rect = {(int)game_state->player_car.pos.x,(int)game_state->player_car.pos.y,32,16};
+        p_draw_rect.x += cam_pos.x;
+        p_draw_rect.y += cam_pos.y;
+
+        game_state->textureShader.UniformM4fv("model",rotate_model_matrix(game_state->player_car.angle_body,p_draw_rect,{10,8}));
+
+        GL_DrawTexture({0,0,32,16},p_draw_rect);
+        /*
+        game_state->textureShader.Uniform1i("_texture",game_state->arrow_texture);
+        iRect arrow_draw_rect={cam_pos.x+(i32)game_state->player_car.pos.x,cam_pos.y+(i32)game_state->player_car.pos.y,16,32};
+        game_state->textureShader.UniformM4fv("model",rotate_model_matrix(game_state->player_car.angle_body+game_state->player_car.turn+PI/2,arrow_draw_rect,{8,32}));
+        GL_DrawTexture({0,0,16,32},arrow_draw_rect);
+        */
+        
     } else if (game_state->mode == GM_ROAD_LESS_TRAVELLED) {
         UseShader(&game_state->textureShader);
         glActiveTexture(GL_TEXTURE0);
@@ -606,47 +735,6 @@ GAME_UPDATE_AND_RENDER(GameUpdateAndRender) {
         }
     }
 
-    /*
-    UseShader(&game_state->textureShader);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D,game_state->player_texture);
-    glUniform1i(game_state->textureShader.Uniform("_texture"),0);
-    glUniform4f(game_state->textureShader.Uniform("colorMod"),1.0f,1.0f,1.0f,1.0f);
-    glUniformMatrix4fv(game_state->textureShader.Uniform("projection"), 1, GL_FALSE, glm::value_ptr(game_state->projection));
-
-    glm::mat4 model = glm::mat4(1.0f);
-    if (game_state->player.rotation != 0) {
-        glm::vec2 pos = glm::vec2(game_state->player.pos.x,game_state->player.pos.y);
-        float angleRadians = game_state->player.rotation;
-        // Calculate the center of the object for rotation
-        glm::vec2 size = glm::vec2(64,64);
-        glm::vec2 center = pos + size * 0.5f;
-        model = glm::translate(model, glm::vec3(center, 0.0f)); // Move pivot to center
-        model = glm::rotate(model, angleRadians, glm::vec3(0.0f, 0.0f, 1.0f)); // Rotate
-        model = glm::translate(model, glm::vec3(-center, 0.0f)); // Move pivot back
-    }
-
-    glUniformMatrix4fv(game_state->textureShader.Uniform("model"), 1, GL_FALSE, glm::value_ptr(model));
-
-    GL_DrawTexture({game_state->player.frame*16,0,16,16},{(int)game_state->player.pos.x,(int)game_state->player.pos.y,16,16});
-    */
-
-
-
-    /*
-
-    ImGui_ImplSDLRenderer2_NewFrame();
-    ImGui_ImplSDL2_NewFrame();
-    ImGui::NewFrame();
-    ImGui::Begin("Debug");
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-    
-    ImGui::End();
-    ImGui::Render();
-    
-    ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
-    */
     SDL_GL_SwapWindow(window);
 }
 

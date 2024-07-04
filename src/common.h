@@ -1,3 +1,4 @@
+
 #pragma once
 #include <inttypes.h>
 
@@ -110,8 +111,14 @@ inline v2 &operator-=(v2 &left, v2 right) {
 
 
 struct v2i {
-    int x = 0;
-    int y = 0;
+    i32 x = 0;
+    i32 y = 0;
+    v2i () {}
+    v2i(i32 nx, i32 ny) : x(nx),y(ny){}
+    v2i(v2 copy) {
+        x = (i32)copy.x;
+        y = (i32)copy.y;
+    }
 };
 
 

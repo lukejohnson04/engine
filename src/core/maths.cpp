@@ -3,10 +3,11 @@
 
 #define MAX(a,b) ((a>=b)?(a):(b))
 #define MIN(a,b) ((a<=b)?(a):(b))
+#define CLAMP(min,max,val) (((val)<(min))?(min):((val)>(max))?(max):(val))
 
 //#include <cmath>
 
-#define PI 3.1415926f
+#define PI 3.1415926
 
 v2 v2::normalize() {
     float len = sqrt((x * x) + (y * y));

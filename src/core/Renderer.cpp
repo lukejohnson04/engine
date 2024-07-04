@@ -1,6 +1,7 @@
 
 
 
+
 #include "Shader.cpp"
 
 const Color COLOR_BLACK = Color(0,0,0,255);
@@ -152,6 +153,23 @@ void GL_DrawTextureEx(iRect source={0,0,0,0}, iRect dest={0,0,0,0}, bool flip_x=
 }
 */
 
+glm::mat4 rotate_model_matrix(float angleRadians, iRect rect, v2 origin) {
+    glm::mat4 model = glm::mat4(1.0f);
+    glm::vec2 pos = glm::vec2(rect.x, rect.y);
+    // Calculate the center of the object for rotation
+    glm::vec2 center = pos + glm::vec2(origin.x,origin.y);
+    model = glm::translate(model, glm::vec3(center, 0.0f)); // Move pivot to center
+    model = glm::rotate(model, angleRadians, glm::vec3(0.0f, 0.0f, 1.0f)); // Rotate
+    model = glm::translate(model, glm::vec3(-center, 0.0f)); // Move pivot back
+    return model;
+}
+
+
+glm::mat4 rotate_model_matrix(float angleRadians, iRect rect) {
+    v2 origin = {rect.w/2.f,rect.h/2.f};
+    return rotate_model_matrix(angleRadians,rect,origin);
+}
+
 
 internal void GL_load_texture(GLuint tex, const char* path) {
     SDL_Surface *tex_surf = IMG_Load(path);
@@ -246,3 +264,21 @@ internal void generate_text(GLuint tex, TTF_Font *font,std::string str,Color col
     SDL_FreeSurface(temp_surface);
 }
 
+    
+struct camera_t {
+    v2 pos={0,0};
+    v2 size;
+    float zoom=1.0f;
+    
+    iRect get_draw_rect() {
+        return {(int)(pos.x-size.x/2),(int)(pos.y-size.y/2),(int)size.x,(int)size.y};
+    }
+
+    v2 get_offset() {
+        return pos - (v2(size.x/2.f,size.y/2.f));
+    }
+
+    v2 get_center() {
+        return pos + (v2(size.x/2.f,size.y/2.f));
+    }
+};
