@@ -10,9 +10,25 @@ const Color COLOR_RED = Color(255,0,0,255);
 const Color COLOR_BLUE = Color(0,0,255,255);
 const Color COLOR_GREEN = Color(0,255,0,255);
 const Color COLOR_YELLOW = Color(255,255,0,255);
+const Color COLOR_TRANSPARENT = Color(0,0,0,0);
+
+
+v2i global_draw_offset={0,0};
+
+void GL_PushOffset(v2i offset) {
+    global_draw_offset = offset;
+}
+
+void GL_PopOffset() {
+    global_draw_offset={0,0};
+}
+
 
 
 void GL_DrawRect(iRect rect) {
+    rect.x += global_draw_offset.x;
+    rect.y += global_draw_offset.y;
+
     float vertices[] = {
         (float)rect.x+rect.w,    (float)rect.y,           0.0f,
         (float)rect.x+rect.w,    (float)rect.y+rect.h,    0.0f,
@@ -40,21 +56,26 @@ void GL_DrawRect(iRect rect) {
     glBindVertexArray(0);    
 }
 
-void GL_DrawTexture(iRect source, iRect dest) {
+void GL_DrawTexture(iRect source, iRect dest, bool flip_x=false, bool flip_y=false) {
     float u1 = 0.0f;
     float u2 = 1.0f;
     float v1 = 0.0f;
     float v2 = 1.0f;
+
+    dest.x += global_draw_offset.x;
+    dest.y += global_draw_offset.y;
 
     v2i tex_size = {0,0};
     if (source.w!=0) {
         // store this info in some data structure maybe?
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &tex_size.x);
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &tex_size.y);
-        u1 = (float)source.x / (float)tex_size.x;
-        u2 = (float)(source.x + source.w) / (float)tex_size.x;
-        v1 = (float)source.y / (float)tex_size.y;
-        v2 = (float)(source.y + source.h) / (float)tex_size.y;
+        if (source.w!=0) {
+            (flip_x ? u2 : u1) = (float)source.x / (float)tex_size.x;
+            (flip_x ? u1 : u2) = (float)(source.x + source.w) / (float)tex_size.x;
+            (flip_y ? v2 : v1) = (float)source.y / (float)tex_size.y;
+            (flip_y ? v1 : v2) = (float)(source.y + source.h) / (float)tex_size.y;
+        }
     }
     
     float vertices[] = {
@@ -264,12 +285,11 @@ internal void generate_text(GLuint tex, TTF_Font *font,std::string str,Color col
     SDL_FreeSurface(temp_surface);
 }
 
-    
 struct camera_t {
     v2 pos={0,0};
     v2 size;
     float zoom=1.0f;
-    
+     
     iRect get_draw_rect() {
         return {(int)(pos.x-size.x/2),(int)(pos.y-size.y/2),(int)size.x,(int)size.y};
     }
@@ -282,3 +302,36 @@ struct camera_t {
         return pos + (v2(size.x/2.f,size.y/2.f));
     }
 };
+
+
+
+Uint32 getpixel(SDL_Surface *surface, int x, int y) {
+    int bpp = surface->format->BytesPerPixel;
+    /* Here p is the address to the pixel we want to retrieve */
+    Uint8 *p = (Uint8 *)surface->pixels + y * surface->pitch + x * bpp;
+
+    switch (bpp)
+    {
+        case 1:
+            return *p;
+            break;
+
+        case 2:
+            return *(Uint16 *)p;
+            break;
+
+        case 3:
+            if (SDL_BYTEORDER == SDL_BIG_ENDIAN)
+                return p[0] << 16 | p[1] << 8 | p[2];
+            else
+                return p[0] | p[1] << 8 | p[2] << 16;
+            break;
+
+        case 4:
+            return *(Uint32 *)p;
+            break;
+
+        default:
+            return 0;       /* shouldn't happen, but avoids warnings */
+    }
+}

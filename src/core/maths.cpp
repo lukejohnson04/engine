@@ -8,6 +8,7 @@
 //#include <cmath>
 
 #define PI 3.1415926
+#define PIf 3.1415926f
 
 v2 v2::normalize() {
     float len = sqrt((x * x) + (y * y));
@@ -62,7 +63,7 @@ v2 angle_to_vec(float angle) {
 // Function to determine difference between angles, accounting for wrapping (i.e. comparing 720 and 30)
 internal
 float angle_diff(float a, float b) {
-    return PI - abs(abs(a-b) - PI);
+    return PIf - abs(abs(a-b) - PIf);
 }
 
 internal
@@ -83,17 +84,17 @@ int lerp(int a, int b, float t) {
 
 internal
 float lerp(float a, float b, float t) {
-    return a * (1.0 - t) + (b * t);
+    return a * (1.0f - t) + (b * t);
 }
 
 internal
 float deg_2_rad(float d) {
-    return d * (PI/180.f);
+    return d * (PIf/180.f);
 }
 
 internal
 float rad_2_deg(float d) {
-    return d / (PI/180.f);
+    return d / (PIf/180.f);
 }
 
 internal
@@ -111,22 +112,22 @@ float distance_between(v2 a, v2 b) {
 internal
 float lerp_rotation(float rot, float dest, float t) {
     if (dest - rot > PI) {
-        dest -= PI*2;
+        dest -= PIf*2;
     }
     float res = lerp(rot,dest,t);
     if (res < 0) {
-        res += PI*2;
+        res += PIf*2;
     }
     return res;
 }
 
 internal
 inline float wrap_rotation(float rot) {
-    while (rot >= PI*2) {
-        rot -= PI*2;
+    while (rot >= PIf*2) {
+        rot -= PIf*2;
     }
     while (rot < 0) {
-        rot += PI*2;
+        rot += PIf*2;
     }
     return rot;
 }

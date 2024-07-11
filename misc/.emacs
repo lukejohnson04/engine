@@ -28,7 +28,7 @@
 (setq casey-font "outline-DejaVu Sans Mono")
 
 (when casey-win32 
-  (setq casey-makescript "C:/dev/Prototypes/engine/build/build.bat")
+  (setq casey-makescript "B:/dev/Prototypes/engine/build/build.bat")
   (setq casey-font "outline-Liberation Mono")
 )
 
@@ -427,7 +427,8 @@
 (define-key global-map "" 'copy-region-as-kill)
 (define-key global-map "" 'yank)
 (define-key global-map "" 'nil)
-(define-key global-map "" 'rotate-yank-pointer)
+; removed this so C-e goes back to the default command of going to the end of the line
+; (define-key global-map "" 'rotate-yank-pointer)
 (define-key global-map "\eu" 'undo)
 (define-key global-map "\e6" 'upcase-word)
 (define-key global-map "\e^" 'captilize-word)
@@ -518,6 +519,28 @@
 (setq-default truncate-lines t)
 (setq truncate-partial-width-windows nil)
 (split-window-horizontally)
+(delete-selection-mode 1)
+(electric-indent-mode 1)
+(electric-pair-mode 1)
+
+(defun my-electric-pair-open-newline-between-pairs-psif-hack (orig-func &rest args)
+    (ignore orig-func args)
+    (when (and (if (functionp electric-pair-open-newline-between-pairs)
+                   (funcall electric-pair-open-newline-between-pairs)
+                 electric-pair-open-newline-between-pairs)
+               (eq last-command-event ?\n)
+               (< (1+ (point-min)) (point) (point-max))
+               (eq (save-excursion
+                     (skip-chars-backward "\t\s")
+                     (char-before (1- (point))))
+                   (matching-paren (char-after))))
+      (save-excursion (newline-and-indent 1))))
+  (advice-add 'electric-pair-open-newline-between-pairs-psif
+              :around
+              #'my-electric-pair-open-newline-between-pairs-psif-hack)
+;(setq electric-pair-inhibit-predicate 'my-electric-pair-inhibit)
+
+
 
 (custom-set-variables
  ;; custom-set-variables was added by Custom.

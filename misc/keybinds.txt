@@ -45,3 +45,24 @@ ALT-N        Go to the next error after a compile
 ALT-SHIFT-N  Go to the previous error after a compile
 
 ALT-G        Goto line number
+
+M = ALT
+C = CTRL
+
+C-a          Go to beginning of line
+C-e          Go to end of line
+
+
+
+A balanced expression is a paranthetical group, or a number/word/symbol.
+
+C-M-u        Jump to beginning of containing block
+
+
+C-M-n        Move forward over a parenthetical group
+C-M-p        Move backward over a parenthetical group
+
+C-M-f        Move forward over a balanced expression
+C-M-b        Move backward over a balanced expression
+C-M-k        Kill balanced expression forward
+C-M-SPC      Put the mark at the end of the sexp

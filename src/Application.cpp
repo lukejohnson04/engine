@@ -1,4 +1,3 @@
-
 #pragma once
 #include <string>
 
@@ -19,7 +18,13 @@ struct Application {
 };
 
 
+#include <windows.h>
+
+#ifdef DEBUG
 int main() {
+#else
+int WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine,int nShowCmd) {
+#endif
     Application app = Application();
     app.Run("");
 
@@ -28,7 +33,6 @@ int main() {
 
 
 #include <iostream>
-#include <windows.h>
 #include "core/engine.cpp"
 
 #define WINDOW_WIDTH 720
@@ -105,7 +109,7 @@ void Application::OnEvent(Event e) {
 global_variable int global_clock=0;
 global_variable int last_frame_time=0;
 internal void sleep_till_next_update() {
-    int dl_time = last_frame_time + FRAME_TIME_MS - SDL_GetTicks();
+    int dl_time = (int)(last_frame_time + FRAME_TIME_MS - SDL_GetTicks());
     SDL_Delay(dl_time > 0 ? dl_time : 0);
     global_clock = SDL_GetTicks();
     last_frame_time = global_clock;

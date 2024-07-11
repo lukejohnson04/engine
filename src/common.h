@@ -52,7 +52,6 @@ enum {
 struct Color {
     u8 r, g, b, a;
     Color(u8 nr=0, u8 ng=0, u8 nb=0, u8 na=0) : r(nr), g(ng), b(nb), a(na) {}
-    Color(u32 hex) : r((hex >> 24) & u8(~(1<<8))), g((hex >> 16) & u8(~(1<<8))), b((hex >> 8) & u8(~(1<<8))), a(hex & u8(~(1<<8))) {}
 
     u32 hex() {
         return (r << 24) | (g << 16) | (b << 8) | a;
@@ -62,6 +61,11 @@ struct Color {
 inline bool operator==(Color left, Color right) {
     return left.r == right.r && left.g == right.g && left.b == right.b && left.a == right.a;
 }
+
+inline bool operator!=(Color left, Color right) {
+    return !(left == right);
+}
+
 
 struct v2 {
     v2(float nx, float ny) : x(nx), y(ny) {}
