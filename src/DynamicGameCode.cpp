@@ -137,6 +137,7 @@ struct GameState {
     GLuint lineup_arrow_texture;
     GLuint newspaper_texture;
     GLuint lineup_main_menu_bg_texture;
+    GLuint lineup_crime_bar_texture;
     camera_t lineup_camera;
     i32 current_target=0;
 
@@ -483,9 +484,9 @@ void LineupIncorrectAudio() {
 void InitializeGameMemory(GameMemory *memory) {
     *game_state = {};
 
-    game_state->colorShader = CreateShader("../src/shaders/color.vert","../src/shaders/color.frag");
-    game_state->textureShader = CreateShader("../src/shaders/texture.vert","../src/shaders/texture.frag");
-    game_state->bodyShader = CreateShader("../src/shaders/body.vert","../src/shaders/body.frag");
+    game_state->colorShader = CreateShader("color.vert","color.frag");
+    game_state->textureShader = CreateShader("texture.vert","texture.frag");
+    game_state->bodyShader = CreateShader("body.vert","body.frag");
     game_state->projection = glm::ortho(0.0f, static_cast<float>(NATIVE_GAME_WIDTH), static_cast<float>(NATIVE_GAME_HEIGHT), 0.0f, -1.0f, 1.0f);
     game_state->mode = GM_UNSELECTED;
     game_state->travelled_state = GameState::POEM_SCROLL;
@@ -529,6 +530,8 @@ void InitializeGameMemory(GameMemory *memory) {
     GL_load_texture(game_state->newspaper_texture,"res/imgs/newspaper.png");
     glGenTextures(1,&game_state->lineup_main_menu_bg_texture);
     GL_load_texture(game_state->lineup_main_menu_bg_texture,"res/imgs/police_backdrop.png");
+    glGenTextures(1,&game_state->lineup_crime_bar_texture);
+    GL_load_texture(game_state->lineup_crime_bar_texture,"res/imgs/crimebar.png");
 
     glGenTextures(1,&game_state->obese_menu_texture);
     GL_load_texture(game_state->obese_menu_texture,"res/imgs/obese_menu.png");
@@ -672,7 +675,7 @@ GAME_UPDATE_AND_RENDER(GameUpdateAndRender) {
                     }
                 }
             } else if (game_state->lineup_state == GameState::BRIEFING) {
-                if (input->just_pressed[SDL_SCANCODE_RETURN]) {
+                if (input->just_pressed[SDL_SCANCODE_RETURN] || input->mouse_just_pressed) {
                     game_state->lineup_dialogue_line++;
                     if (game_state->lineup_dialogue_line >= (game_state->lineup_level+1)*7) {
                         game_state->lineup_state = GameState::CHOOSING;
@@ -734,7 +737,7 @@ GAME_UPDATE_AND_RENDER(GameUpdateAndRender) {
                         LineupLoadLevel(game_state->lineup_level+1);
                     }
                 } else {
-                    if (input->just_pressed[SDL_SCANCODE_RETURN]) {
+                    if (input->just_pressed[SDL_SCANCODE_RETURN] || input->mouse_just_pressed) {
                         game_state->fade_timer=0.f;
                         game_state->newspaper_fadeout=true;
                     }
@@ -1190,6 +1193,10 @@ render_begin:
             GL_DrawTexture(left_arrow_rect,lineup_left_arrow_dest);
             GL_DrawTexture(right_arrow_rect,lineup_right_arrow_dest,true);
 
+            game_state->textureShader.Uniform1i("_texture",game_state->lineup_crime_bar_texture);
+            GL_DrawTexture({game_state->lineup_level * 216,0,216,24},{12,0,216,24});
+            
+
             if (game_state->lineup_choice_made) {
                 float fade_timer = game_state->fade_timer;
                 float fade_len = 2.0f;
@@ -1290,7 +1297,7 @@ render_begin:
                 "Choose wisely."
             };
 
-            if (input->just_pressed[SDL_SCANCODE_RETURN] || game_state->dialogue_line==-1) {
+            if (input->just_pressed[SDL_SCANCODE_RETURN] || input->mouse_just_pressed || game_state->dialogue_line==-1) {
                 game_state->dialogue_line++;
                 if (game_state->dialogue_line >= 13) {
                     game_state->travelled_state = GameState::CHOICE;
@@ -1382,7 +1389,7 @@ render_begin:
                 glUniformMatrix4fv(game_state->colorShader.Uniform("projection"), 1, GL_FALSE, glm::value_ptr(game_state->projection));
                 glUniform4f(game_state->colorShader.Uniform("color"),0.0f,0.0f,0.0f,1.0f);
                 GL_DrawRect({0,0,NATIVE_GAME_WIDTH,NATIVE_GAME_HEIGHT});
-                if ((input->just_pressed[SDL_SCANCODE_RETURN] || game_state->dialogue_line==-1)) {
+                if ((input->just_pressed[SDL_SCANCODE_RETURN] || input->mouse_just_pressed || game_state->dialogue_line==-1)) {
                     game_state->dialogue_line++;
 
                     char dialogue[11][128] = {
@@ -1432,7 +1439,7 @@ render_begin:
                         game_state->dialogue_line=-1;
                     }
                 } else {
-                    if (input->just_pressed[SDL_SCANCODE_RETURN] || game_state->dialogue_line==-1) {
+                    if (input->just_pressed[SDL_SCANCODE_RETURN] || input->mouse_just_pressed || game_state->dialogue_line==-1) {
                         game_state->dialogue_line++;
                         char dialogue[8][128] = {
                             "A great journey, a great voyage, lengthy trail, nature awaits.",
@@ -1510,7 +1517,7 @@ render_begin:
                 glUniformMatrix4fv(game_state->colorShader.Uniform("projection"), 1, GL_FALSE, glm::value_ptr(game_state->projection));
                 glUniform4f(game_state->colorShader.Uniform("color"),0.0f,0.0f,0.0f,1.0f);
                 GL_DrawRect({0,0,NATIVE_GAME_WIDTH,NATIVE_GAME_HEIGHT});
-                if ((input->just_pressed[SDL_SCANCODE_RETURN] || game_state->dialogue_line==-1)) {
+                if ((input->just_pressed[SDL_SCANCODE_RETURN] || input->mouse_just_pressed || game_state->dialogue_line==-1)) {
                     game_state->dialogue_line++;
 
                     char dialogue[9][128] = {
@@ -1557,7 +1564,7 @@ render_begin:
                         game_state->dialogue_line=-1;
                     }
                 } else {
-                    if (input->just_pressed[SDL_SCANCODE_RETURN] || game_state->dialogue_line==-1) {
+                    if (input->just_pressed[SDL_SCANCODE_RETURN] || input->mouse_just_pressed || game_state->dialogue_line==-1) {
                         game_state->dialogue_line++;
                         char dialogue[6][128] = {
                             "And so it became clear, a joyous time, and a pleasant ride later",

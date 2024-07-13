@@ -1,4 +1,10 @@
 
+#ifdef RELEASE
+#define SHADER_PATH "shaders/"
+#else
+#define SHADER_PATH "../src/shaders/"
+#endif
+
 
 std::string readShaderFile(const std::string &shaderPath) {
     std::ifstream shaderFile;
@@ -98,6 +104,6 @@ void UseShader(Shader *shader) {
 
 Shader CreateShader(const std::string &vertexPath, const std::string &fragmentPath) {
     Shader shader;
-    shader.id = createShaderProgram(vertexPath,fragmentPath);
+    shader.id = createShaderProgram(SHADER_PATH + vertexPath,SHADER_PATH + fragmentPath);
     return shader;
 }
