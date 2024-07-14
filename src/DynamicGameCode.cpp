@@ -1,5 +1,6 @@
 
 #include "core/engine.cpp"
+#include "gm_dinner.h"
 
 #define WINDOW_WIDTH 720
 #define WINDOW_HEIGHT 540
@@ -38,6 +39,7 @@ enum GameMode {
     GM_DRIVING,
     GM_OBESE,
     GM_POLICE_LINEUP,
+    GM_DINNER,
     GM_COUNT,
     GM_UNSELECTED
 };
@@ -138,13 +140,19 @@ struct GameState {
     GLuint newspaper_texture;
     GLuint lineup_main_menu_bg_texture;
     GLuint lineup_crime_bar_texture;
+
+    GLuint dinner_tiles_texture;
+    GLuint dinner_host_texture;
+
     camera_t lineup_camera;
     i32 current_target=0;
+
+    GmDinnerData gm_dinner_data;
 
     enum {
         MAIN_MENU,
         GAMEPLAY
-    } overall_game_state = MAIN_MENU;
+    } overall_game_state = GAMEPLAY;
     
     enum {
         LL_MAIN_MENU,
@@ -488,7 +496,7 @@ void InitializeGameMemory(GameMemory *memory) {
     game_state->textureShader = CreateShader("texture.vert","texture.frag");
     game_state->bodyShader = CreateShader("body.vert","body.frag");
     game_state->projection = glm::ortho(0.0f, static_cast<float>(NATIVE_GAME_WIDTH), static_cast<float>(NATIVE_GAME_HEIGHT), 0.0f, -1.0f, 1.0f);
-    game_state->mode = GM_UNSELECTED;
+    game_state->mode = GM_DINNER;
     game_state->travelled_state = GameState::POEM_SCROLL;
 
     game_state->player = {};
@@ -535,13 +543,16 @@ void InitializeGameMemory(GameMemory *memory) {
 
     glGenTextures(1,&game_state->obese_menu_texture);
     GL_load_texture(game_state->obese_menu_texture,"res/imgs/obese_menu.png");
-
     glGenTextures(1,&game_state->obese_controls_texture);
     GL_load_texture(game_state->obese_controls_texture,"res/imgs/obese_controls.png");
-
     glGenTextures(1,&game_state->obese_credits_texture);
     GL_load_texture(game_state->obese_credits_texture,"res/imgs/obese_credits.png");
-    
+
+    glGenTextures(1,&game_state->dinner_tiles_texture);
+    GL_load_texture(game_state->dinner_tiles_texture,"res/imgs/dinner_tiles.png");
+    glGenTextures(1,&game_state->dinner_host_texture);
+    GL_load_texture(game_state->dinner_host_texture,"res/imgs/dinner_host.png");
+
 
     game_state->font = TTF_OpenFont("res/fonts/Alkhemikal.ttf",16);
     if (game_state->font == nullptr) {
@@ -591,6 +602,22 @@ void InitializeGameMemory(GameMemory *memory) {
         game_state->lineup_level = -1;
     }
     */
+
+    SDL_Surface *house_layout_surface = IMG_Load("res/imgs/dinner_house.png");
+    for (i32 x=0; x<DINNER_MAP_WIDTH; x++) {
+        for (i32 y=0; y<DINNER_MAP_HEIGHT; y++) {
+            Color col = {0,0,0,0};
+            Uint32 data = getpixel(house_layout_surface,x,y);
+            SDL_GetRGBA(data, house_layout_surface->format, &col.r, &col.g, &col.b, &col.a);
+            if (col == COLOR_BLACK) {
+                game_state->gm_dinner_data.dinner_world_map[x][y] = 1;            
+            } else if (col == Color({255,100,0,255})) {
+                game_state->gm_dinner_data.dinner_world_map[x][y] = 3;
+            } else {
+                game_state->gm_dinner_data.dinner_world_map[x][y] = 0;
+            }
+        }
+    }
     
     // load all textures
     memory->is_initialized = true;
@@ -639,6 +666,8 @@ global_variable iRect lineup_right_arrow_dest = {NATIVE_GAME_WIDTH-4-16,54,16,32
 global_variable iRect lineup_choice_button_rect = {NATIVE_GAME_WIDTH/2-64/2,144 + 4,64,20};
 global_variable iRect lineup_main_menu_play_button_rect = {83,136,70,24};
 
+#include "gm_dinner.cpp"
+
 
 #if defined __cplusplus
 extern "C"
@@ -664,6 +693,10 @@ GAME_UPDATE_AND_RENDER(GameUpdateAndRender) {
             
         } else if (game_state->mode == GM_ROAD_LESS_TRAVELLED) {
             game_state->text_scroll_amount += timestep;
+
+            
+        } else if (game_state->mode == GM_DINNER) {
+            UpdateGmDinner(timestep);
 
         } else if (game_state->mode == GM_POLICE_LINEUP) {
             if (game_state->lineup_state == GameState::MAIN_MENU) {
@@ -952,7 +985,6 @@ render_begin:
             }
         }
         
-        
         goto endof_frame;
     }
     
@@ -967,6 +999,10 @@ render_begin:
         //glUniformMatrix4fv(game_state->textureShader.Uniform("model"), 1, GL_FALSE, glm::value_ptr(model));
 
         GL_DrawTexture({0,0,160,120},{0,0,160,120});
+        
+    } else if (game_state->mode == GM_DINNER) {
+        DrawGmDinner();
+
     } else if (game_state->mode == GM_OBESE) {
         UseShader(&game_state->colorShader);
         game_state->colorShader.UniformColor("color",COLOR_BLACK);

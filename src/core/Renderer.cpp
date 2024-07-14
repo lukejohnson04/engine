@@ -1,7 +1,4 @@
 
-
-
-
 #include "Shader.cpp"
 
 const Color COLOR_BLACK = Color(0,0,0,255);
