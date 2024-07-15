@@ -16,6 +16,29 @@ v2 closest_point_on_line(v2 l1, v2 l2, v2 point) {
     return ans;
 }
 
+void InitGmDinner() {
+    GmDinnerData *data = &game_state->gm_dinner_data;
+    SDL_Surface *house_layout_surface = IMG_Load("res/imgs/dinner_house.png");
+    for (i32 x=0; x<DINNER_MAP_WIDTH; x++) {
+        for (i32 y=0; y<DINNER_MAP_HEIGHT; y++) {
+            Color col = {0,0,0,0};
+            Uint32 pixel = getpixel(house_layout_surface,x,y);
+            SDL_GetRGBA(pixel, house_layout_surface->format, &col.r, &col.g, &col.b, &col.a);
+            if (col == COLOR_BLACK) {
+                game_state->gm_dinner_data.dinner_world_map[y][x] = 1;
+            } else if (col == Color({255,0,0,255})) {
+                game_state->gm_dinner_data.dinner_world_map[y][x] = 2;
+            } else if (col == Color({255,100,0,255})) {
+                game_state->gm_dinner_data.dinner_world_map[y][x] = 3;
+            } else {
+                game_state->gm_dinner_data.dinner_world_map[y][x] = 0;
+            }
+        }
+    }
+
+    data->world_objects[GmDinnerData::GO_TV].on = true;
+}
+
 
 void UpdateGmDinner(float timestep) {
     GmDinnerData *data = &game_state->gm_dinner_data;
@@ -34,6 +57,20 @@ void UpdateGmDinner(float timestep) {
     double move_speed = 1.5;
     double rot_speed = 1.5;
 
+    auto &door_state = data->door_state;
+    static float door_opened_timer=0.f;
+    static v2i door_pos = {0,0};
+
+    auto &world_objects = data->world_objects;
+
+    world_objects[GmDinnerData::GO_TV].pos = {30,25.5f};
+    world_objects[GmDinnerData::GO_CHINA].pos = {29.5f,29};
+    world_objects[GmDinnerData::GO_HOST].pos = {(float)data->host_x,(float)data->host_y};
+
+    data->hover_object = GmDinnerData::GO_NONE;
+        
+
+    
     if (input->is_pressed[SDL_SCANCODE_LSHIFT]) {
         move_speed *= 2.0;
         rot_speed *= 2.0;
@@ -53,8 +90,14 @@ void UpdateGmDinner(float timestep) {
         move_y += -dir_x * delta;
     }
 
+    struct {
+        union {
+            v2i pos={0,0};
+        };
+    } hover_obj;
+    
     v2 player = {(float)player_x,(float)player_y};
-    if (input->just_pressed[SDL_SCANCODE_E]) {
+    {
         // loop through and see what was interacted with
         for (i32 x=0; x<DINNER_MAP_WIDTH; x++) {
             for (i32 y=0; y<DINNER_MAP_HEIGHT; y++) {
@@ -72,10 +115,39 @@ void UpdateGmDinner(float timestep) {
                 float dist_to_ray = distance_between(ray_col,center);
                 
                 if (dist_to_ray < 0.5f) {
-                    dinner_world_map[x][y] = 0;
+                    data->hover_object = GmDinnerData::GO_DOOR;
+                    hover_obj.pos = {x,y};
                     break;
                 }
             }
+        }
+        
+        for (i32 ind=0;ind<GmDinnerData::GO_COUNT;ind++) {
+            v2 object = data->world_objects[ind].pos;
+            if (distance_between(player,object) > 2) {
+                continue;
+            }
+
+            v2 ray = {player.x+(float)dir_x,player.y+(float)dir_y};
+            v2 ray_col = closest_point_on_line(player,ray,object);
+            float dist_to_ray = distance_between(ray_col,object);
+                
+            if (dist_to_ray < 0.5f) {
+                data->hover_object = ind;
+                break;
+            }                
+        }
+    }
+
+    if (data->hover_object != GmDinnerData::GO_NONE && input->just_pressed[SDL_SCANCODE_E]) {
+        if (data->hover_object == GmDinnerData::GO_DOOR) {
+            Mix_PlayChannel(0,game_state->dinner_knock,0);
+            door_pos=hover_obj.pos;
+            door_state = GmDinnerData::DOOR_KNOCKED;
+        } else if (data->hover_object == GmDinnerData::GO_TV) {
+            data->world_objects[GmDinnerData::GO_TV].on ^= 1;
+        } else if (data->hover_object == GmDinnerData::GO_CHINA) {
+            Mix_PlayChannel(0,game_state->dinner_china_interact,0);
         }
     }
     
@@ -114,7 +186,81 @@ void UpdateGmDinner(float timestep) {
             dir_y = old_dir_x * sin(ROT_SPEED) + dir_y * cos(ROT_SPEED);
         }
     }
-
+    
+    // update world
+    if (door_state != GmDinnerData::DOOR_CLOSED) {
+        door_opened_timer += timestep;
+        if (door_state == GmDinnerData::DOOR_KNOCKED) {
+            if (door_opened_timer >= 2.f) {
+                dinner_world_map[door_pos.x][door_pos.y] = 0;
+                data->host_x = 35;
+                data->host_y = 28;
+                door_state = GmDinnerData::DOOR_OPENING;
+                door_opened_timer=0;
+                Mix_PlayChannel(1,game_state->dinner_door_open,0);
+            }
+            
+        } else if (door_state == GmDinnerData::DOOR_OPENING) {
+            if (door_opened_timer >= 0.75f) {
+                door_opened_timer=0;
+                door_state = GmDinnerData::SLIDE_IN_FRONT;
+            }
+        } else if (door_state == GmDinnerData::SLIDE_IN_FRONT) {
+            double timer_len = 0.5;
+            double timer = MIN(timer_len,door_opened_timer/timer_len);
+            data->host_x = 35 + timer*2.0;
+            data->host_y = 28.5 + timer*2.0;
+            if (door_opened_timer >= timer_len) {
+                door_state = GmDinnerData::SPEAK;
+                Mix_PlayChannel(0,game_state->dinner_greeting,0);
+                door_opened_timer=0;
+            }
+        } else if (door_state == GmDinnerData::SPEAK) {
+            if (Mix_Playing(0) == false) {
+                door_state = GmDinnerData::DOOR_CLOSED;
+                data->gameplay_state = GmDinnerData::CHOICE;
+                data->text_yes = generate_text_obj(game_state->font,"yes",COLOR_WHITE,0);
+                data->text_no = generate_text_obj(game_state->font,"no",COLOR_WHITE,0);
+                data->text_yes.position = {NATIVE_GAME_WIDTH/2 - NATIVE_GAME_WIDTH/5 - data->text_yes.get_draw_rect().w/2,NATIVE_GAME_HEIGHT/2 + NATIVE_GAME_HEIGHT/5};
+                data->text_no.position = {NATIVE_GAME_WIDTH/2 + NATIVE_GAME_WIDTH/5 - data->text_yes.get_draw_rect().w/2,NATIVE_GAME_HEIGHT/2 + NATIVE_GAME_HEIGHT/5};
+                /*glGenTextures(1,&data->text_yes);
+                glGenTextures(1,&data->text_no);
+                generate_text(data->text_yes,game_state->font,"yes",COLOR_WHITE,0);
+                generate_text(data->text_no,game_state->font,"no",COLOR_WHITE,0);*/
+            }
+        }
+    } if (data->gameplay_state == GmDinnerData::CHOICE) {
+        if (input->mouse_just_pressed) {
+            v2i mpos = GetMousePositionIngame();
+            if (rect_contains_point(data->text_yes.get_draw_rect(),mpos)) {
+                data->gameplay_state = GmDinnerData::GAMEPLAY;
+                Mix_PlayChannel(0,game_state->dinner_yes_to_drink,0);
+                data->host_state = GmDinnerData::SPEAKING;
+            } else if (rect_contains_point(data->text_no.get_draw_rect(),mpos)) {
+                data->gameplay_state = GmDinnerData::GAMEPLAY;
+                Mix_PlayChannel(0,game_state->dinner_no_to_drink,0);
+                data->host_state = GmDinnerData::SPEAKING;
+            }
+        }
+    } if (data->host_state == GmDinnerData::SPEAKING) {
+        if (Mix_Playing(0) == false) {
+            data->host_state = GmDinnerData::TRAVELLING;
+        }
+    } if (data->host_state == GmDinnerData::TRAVELLING) {
+        v2i points[] = {{30,29},{30,25},{34,25}};
+        local_persist i32 point=0;
+        v2 host = {(float)data->host_x,(float)data->host_y};
+        if (distance_between(host,v2((float)points[point].x,(float)points[point].y)) < 0.1) {
+            point++;
+            if (point >= 3) {
+                data->host_state = GmDinnerData::SILENT;
+            }
+        } else {
+            v2 vec = vec_to(host,v2((float)points[point].x,(float)points[point].y)) * timestep * 5.0;
+            data->host_x += (double)vec.x;
+            data->host_y += (double)vec.y;
+        }
+    }
 }
 
 
@@ -126,6 +272,7 @@ void DrawGmDinner() {
     double player_y = data->player_y;
     double plane_x = data->plane_x;
     double plane_y = data->plane_y;
+    auto &world_objects = data->world_objects;
     
     UseShader(&game_state->colorShader);
     game_state->colorShader.UniformColor("color",COLOR_BLACK);
@@ -219,69 +366,113 @@ void DrawGmDinner() {
             GLuint texture = game_state->dinner_tiles_texture;
 
             iRect src_rect = {0,0,32,32};
-            if (collision == 2) {
-                src_rect = {32,0,32,32};
+            if (collision == 1) {
+                src_rect = {96,0,32,32};
+            } else if (collision == 2) {
+                src_rect = {0,0,32,32};
             } else if (collision == 3) {
                 src_rect = {64,0,32,32};                
             }
             texture_x_coord = int(col_x * (double)src_rect.w);
 
-            int wall_height = (int)(NATIVE_GAME_WIDTH/perp_distance);
+            int wall_height = (int)(NATIVE_GAME_HEIGHT/perp_distance);
             iRect rect = {x,(NATIVE_GAME_HEIGHT-wall_height)/2,1,wall_height};
             src_rect = {src_rect.x + (int)(texture_x_coord),0,1,src_rect.h};
             game_state->textureShader.Uniform1i("_texture",texture);
+
+            double min_dist = 6.0;
+            double max_dist = data->max_view_distance;
+            double dist_val = (max_dist - MAX(0,perp_distance - min_dist)) / max_dist;
+            dist_val = MAX(0,dist_val);
+            u8 dist_col = (u8)(dist_val * 255);
+            dist_col = MAX(dist_col,35);
+            game_state->textureShader.UniformColor("colorMod",Color(dist_col,dist_col,dist_col,255));
             GL_DrawTexture(src_rect,rect);
         }
 
-        // see if the ray collides with the host, and if there is a wall collision, check if
-        // the collision to the host is closer than the collision to the wall
-        bool host_collides = false;
-        float host_width = 2.0f;
-        v2 player = {(float)player_x,(float)player_y};
-        v2 line_end = player + v2({(float)target_x,(float)target_y});
-        v2 host = {(float)data->host_x,(float)data->host_y};
-        v2 host_col = closest_point_on_line(player,line_end,host);
-        float dist_to_host = distance_between(host_col,{(float)data->host_x,(float)data->host_y});
-        if (dist_to_host < host_width/2.f) {
-            // scuffed way of making sure the ray doesn't intersect out the wrong side
-            bool correct_direction = distance_between(host_col,line_end) < distance_between(host_col,player);
-            if (correct_direction) {
-                host_collides = true;
+        game_state->textureShader.UniformColor("colorMod",COLOR_WHITE);
+
+        for (i32 ind=0;ind<GmDinnerData::GO_COUNT;ind++) {
+            v2 object=world_objects[ind].pos;
+            // see if the ray collides with the world object, and if there is a wall collision, check if
+            // the collision to the object is closer than the collision to the wall
+            bool collides = false;
+            float width = 2.0f;
+            v2 player = {(float)player_x,(float)player_y};
+            v2 line_end = player + v2({(float)target_x,(float)target_y});
+            v2 col = closest_point_on_line(player,line_end,object);
+            float dist_from_ray_to_obj = distance_between(col,object);
+            if (dist_from_ray_to_obj < width/2.f) {
+                // scuffed way of making sure the ray doesn't intersect out the wrong side
+                bool correct_direction = distance_between(col,line_end) < distance_between(col,player);
+                if (correct_direction) {
+                    collides = true;
+                }
+            }
+
+            // TODO: fix fisheye effect when looking at object
+            // This originates from the fact that the sprite is perpendicular to every ray,
+            // when it should be fixed as perpendicular to the player's true look angle
+            double obj_distance = distance_between(player,object);
+            if (collides && (collision == false || obj_distance < perp_distance)) {
+                float angle_to_obj = angle_to(player,object);
+                float angle_to_target = angle_to(player,line_end);
+                double col_x;
+                if (angle_to_obj-angle_to_target > PIf) {
+                    angle_to_obj += PIf*2;
+                } if (angle_to_target-angle_to_obj > PIf) {
+                    angle_to_target += PIf*2;
+                }
+                if (angle_to_obj > angle_to_target) {
+                    col_x = 0.5 - (dist_from_ray_to_obj/width);
+                } else {
+                    col_x = 0.5 + (dist_from_ray_to_obj/width);
+                }
+
+                double tex_size=0.0;
+                v2i tex_begin={0,0};
+                if (ind == GmDinnerData::GO_TV) {
+                    tex_size = 128;
+                    tex_begin.x = data->world_objects[GmDinnerData::GO_TV].on * (i32)tex_size;
+                    game_state->textureShader.Uniform1i("_texture",game_state->dinner_sprites_texture);
+                } else if (ind == GmDinnerData::GO_CHINA) {
+                    tex_size = 128;
+                    tex_begin = {0,128};
+                    game_state->textureShader.Uniform1i("_texture",game_state->dinner_sprites_texture);
+                } else if (ind == GmDinnerData::GO_HOST) {
+                    tex_size = 640;
+                    game_state->textureShader.Uniform1i("_texture",game_state->dinner_host_texture);
+                }
+                int texture_x_coord = int(tex_begin.x + col_x * tex_size);
+
+                double dist_to_obj = (double)distance_between(player,object);
+
+                // replace this with the height of the distance from the player to the center of the object
+                // that way the height is constant for all angles
+                int wall_height = (int)(NATIVE_GAME_WIDTH/dist_to_obj);
+                iRect rect = {x,(NATIVE_GAME_HEIGHT-wall_height)/2,1,wall_height};
+                iRect src_rect = {(int)(texture_x_coord),tex_begin.y,1,(i32)tex_size};
+                GL_DrawTexture(src_rect,rect);
             }
         }
-
-        // TODO: fix fisheye effect when looking at host
-        // This originates from the fact that the sprite is perpendicular to every ray,
-        // when it should be fixed as perpendicular to the player's true look angle
-        double host_perp_distance = distance_between(player,host_col);
-        if (host_collides && (collision == false || host_perp_distance < perp_distance)) {
-            float angle_to_host = angle_to(player,host);
-            float angle_to_target = angle_to(player,line_end);
-            double col_x;
-            if (angle_to_host-angle_to_target > PIf) {
-                angle_to_host += PIf*2;
-                printf("%f %f\n",angle_to_target,angle_to_host);
-            } if (angle_to_target-angle_to_host > PIf) {
-                angle_to_target += PIf*2;
-                printf("%f %f\n",angle_to_target,angle_to_host);
-            }
-            if (angle_to_host > angle_to_target) {
-                col_x = 0.5 - (dist_to_host/host_width);
-            } else {
-                col_x = 0.5 + (dist_to_host/host_width);
-            }
-            //col_x = player_x + perp_distance * target_x;
-            //col_x -= floor(col_x);
-
-            int texture_x_coord = int(col_x * 128.0);
-
-            int wall_height = (int)(NATIVE_GAME_WIDTH/host_perp_distance);
-            iRect rect = {x,(NATIVE_GAME_HEIGHT-wall_height)/2,1,wall_height};
-            iRect src_rect = {(int)(texture_x_coord),0,1,128};
-            game_state->textureShader.Uniform1i("_texture",game_state->dinner_host_texture);
-            GL_DrawTexture(src_rect,rect);
-        }
-
     }
 
+    // choice text
+    if (data->gameplay_state == GmDinnerData::CHOICE) {
+        game_state->textureShader.Uniform1i("_texture",data->text_yes.gl_texture);
+        GL_DrawTexture({0,0,0,0},data->text_yes.get_draw_rect());
+        game_state->textureShader.Uniform1i("_texture",data->text_no.gl_texture);
+        GL_DrawTexture({0,0,0,0},data->text_no.get_draw_rect());
+    }
+    
+    if (data->hover_object != GmDinnerData::GO_NONE) {
+        game_state->textureShader.Uniform1i("_texture",game_state->dinner_mouse_icons_texture);
+        i32 size = 32;
+        iRect src_rect = {0,0,16,16};
+        if (data->hover_object == GmDinnerData::GO_DOOR) {
+            src_rect.x = 16;
+        }
+        GL_DrawTexture(src_rect,{NATIVE_GAME_WIDTH/2-size/2,NATIVE_GAME_HEIGHT/2-size/2,size,size});
+    }
 }
+

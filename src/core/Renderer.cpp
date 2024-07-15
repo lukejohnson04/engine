@@ -282,6 +282,45 @@ internal void generate_text(GLuint tex, TTF_Font *font,std::string str,Color col
     SDL_FreeSurface(temp_surface);
 }
 
+struct generic_drawable {
+    v2i position={0,0};
+    GLuint gl_texture=NULL;
+    v2 scale={1,1};
+    iRect bound = {0,0,0,0};
+
+    iRect get_draw_rect() {
+        if (bound.w==0||bound.h==0) {
+            glBindTexture(GL_TEXTURE_2D,gl_texture);
+            // mipmap level is 0
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &bound.w);
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &bound.h);
+        }
+        int w=bound.w,h=bound.h;
+        iRect res={position.x,position.y,(int)((float)w*scale.x),(int)((float)h*scale.y)};
+        return res;
+    }
+};
+
+
+internal generic_drawable generate_text_obj(TTF_Font *font,std::string str,Color col={255,255,255,255},GLuint tex=NULL) {
+    generic_drawable res;    
+    SDL_Surface* temp_surface =
+        TTF_RenderText_Solid(font, str.c_str(),*(SDL_Color*)&col);
+    temp_surface = SDL_ConvertSurfaceFormat(temp_surface, SDL_PIXELFORMAT_ARGB8888, 0);
+
+    if (tex != NULL) {
+        glDeleteTextures(1,&tex);
+    }
+    glGenTextures(1,&tex);
+
+    res.gl_texture = tex;
+    GL_load_texture_from_sdl_surface(res.gl_texture,temp_surface);
+    
+    SDL_FreeSurface(temp_surface);
+    return res;
+}
+
+
 struct camera_t {
     v2 pos={0,0};
     v2 size;

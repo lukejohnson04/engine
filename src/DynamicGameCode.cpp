@@ -143,6 +143,15 @@ struct GameState {
 
     GLuint dinner_tiles_texture;
     GLuint dinner_host_texture;
+    GLuint dinner_mouse_icons_texture;
+    GLuint dinner_sprites_texture;
+
+    Mix_Chunk *dinner_knock;
+    Mix_Chunk *dinner_greeting;
+    Mix_Chunk *dinner_door_open;
+    Mix_Chunk *dinner_yes_to_drink;
+    Mix_Chunk *dinner_no_to_drink;
+    Mix_Chunk *dinner_china_interact;
 
     camera_t lineup_camera;
     i32 current_target=0;
@@ -551,7 +560,11 @@ void InitializeGameMemory(GameMemory *memory) {
     glGenTextures(1,&game_state->dinner_tiles_texture);
     GL_load_texture(game_state->dinner_tiles_texture,"res/imgs/dinner_tiles.png");
     glGenTextures(1,&game_state->dinner_host_texture);
-    GL_load_texture(game_state->dinner_host_texture,"res/imgs/dinner_host.png");
+    GL_load_texture(game_state->dinner_host_texture,"res/imgs/dinner_sprites/dinner_host.png");
+    glGenTextures(1,&game_state->dinner_mouse_icons_texture);
+    GL_load_texture(game_state->dinner_mouse_icons_texture,"res/imgs/dinner_mouse_icons.png");
+    glGenTextures(1,&game_state->dinner_sprites_texture);
+    GL_load_texture(game_state->dinner_sprites_texture,"res/imgs/dinner_sprites/dinner_sprites.png");
 
 
     game_state->font = TTF_OpenFont("res/fonts/Alkhemikal.ttf",16);
@@ -569,6 +582,12 @@ void InitializeGameMemory(GameMemory *memory) {
     game_state->dialogue = Mix_LoadWAV("res/sound/traveled_monologue.mp3");
     game_state->travel_music = Mix_LoadMUS("res/sound/travel_music.mp3");
     game_state->obese_breathing = Mix_LoadWAV("res/sound/breathing.wav");
+    game_state->dinner_knock = Mix_LoadWAV("res/sound/dinner_knock_knock.ogg");
+    game_state->dinner_greeting = Mix_LoadWAV("res/sound/dinner_greeting.ogg");
+    game_state->dinner_door_open = Mix_LoadWAV("res/sound/dinner_door_open.ogg");
+    game_state->dinner_yes_to_drink = Mix_LoadWAV("res/sound/dinner_yes_to_drink.ogg");
+    game_state->dinner_no_to_drink = Mix_LoadWAV("res/sound/dinner_no_to_drink.ogg");
+    game_state->dinner_china_interact = Mix_LoadWAV("res/sound/dinner_china_interact.ogg");
 
     for (i32 num=0;num<13;num++) {
         game_state->dialogue_streams[num] = Mix_LoadWAV(("res/sound/traveled_dialogue" + std::to_string(num+1) + ".mp3").c_str());
@@ -603,21 +622,7 @@ void InitializeGameMemory(GameMemory *memory) {
     }
     */
 
-    SDL_Surface *house_layout_surface = IMG_Load("res/imgs/dinner_house.png");
-    for (i32 x=0; x<DINNER_MAP_WIDTH; x++) {
-        for (i32 y=0; y<DINNER_MAP_HEIGHT; y++) {
-            Color col = {0,0,0,0};
-            Uint32 data = getpixel(house_layout_surface,x,y);
-            SDL_GetRGBA(data, house_layout_surface->format, &col.r, &col.g, &col.b, &col.a);
-            if (col == COLOR_BLACK) {
-                game_state->gm_dinner_data.dinner_world_map[x][y] = 1;            
-            } else if (col == Color({255,100,0,255})) {
-                game_state->gm_dinner_data.dinner_world_map[x][y] = 3;
-            } else {
-                game_state->gm_dinner_data.dinner_world_map[x][y] = 0;
-            }
-        }
-    }
+    InitGmDinner();
     
     // load all textures
     memory->is_initialized = true;

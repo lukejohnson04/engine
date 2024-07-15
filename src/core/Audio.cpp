@@ -27,20 +27,6 @@ namespace Audio {
     };
 
     internal_function
-    void PlayMusic(std::string name) {
-        // for (int i=0; i<8; i++) {
-        //     if (music_pool[i] == nullptr) {
-        //         music_pool[i] = Mix_LoadMUS(("../res/sound/" + name).c_str());
-        //         Mix_PlayMusic(music_pool[i], 0);
-        //         return;
-        //     }
-        // }
-        // Mix_FreeMusic(music_pool[0]);
-        // music_pool[0] = Mix_LoadMUS(("../res/sound/"+name).c_str());
-        // Mix_PlayMusic(music_pool[0], 0);
-    }
-
-    internal_function
     void PlayChunk(std::string path, s32 channel) {
         Resource *res = GetChunkResource(path);
         Mix_PlayChannel(channel, res->chunk, -1);
@@ -53,8 +39,6 @@ struct world_audio {
     vec2 global_listener_pos={0,0};
 };
 
-
-world_audio *global_world_audio;
 
 void stop_world_sound(world_sound *sound) {
     Mix_HaltChannel(sound->channel);
