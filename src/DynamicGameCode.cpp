@@ -1,4 +1,5 @@
 
+
 #include "core/engine.cpp"
 #include "gm_dinner.h"
 
@@ -152,6 +153,9 @@ struct GameState {
     Mix_Chunk *dinner_yes_to_drink;
     Mix_Chunk *dinner_no_to_drink;
     Mix_Chunk *dinner_china_interact;
+    Mix_Chunk *dinner_door_lock;
+
+    Mix_Music *dinner_jazz_music;
 
     camera_t lineup_camera;
     i32 current_target=0;
@@ -581,14 +585,18 @@ void InitializeGameMemory(GameMemory *memory) {
 
     game_state->dialogue = Mix_LoadWAV("res/sound/traveled_monologue.mp3");
     game_state->travel_music = Mix_LoadMUS("res/sound/travel_music.mp3");
+
     game_state->obese_breathing = Mix_LoadWAV("res/sound/breathing.wav");
+
     game_state->dinner_knock = Mix_LoadWAV("res/sound/dinner_knock_knock.ogg");
     game_state->dinner_greeting = Mix_LoadWAV("res/sound/dinner_greeting.ogg");
     game_state->dinner_door_open = Mix_LoadWAV("res/sound/dinner_door_open.ogg");
     game_state->dinner_yes_to_drink = Mix_LoadWAV("res/sound/dinner_yes_to_drink.ogg");
     game_state->dinner_no_to_drink = Mix_LoadWAV("res/sound/dinner_no_to_drink.ogg");
     game_state->dinner_china_interact = Mix_LoadWAV("res/sound/dinner_china_interact.ogg");
-
+    game_state->dinner_door_lock = Mix_LoadWAV("res/sound/dinner_door_lock.mp3");
+    game_state->dinner_jazz_music = Mix_LoadMUS("res/sound/dinner_jazz_music.mp3");
+    
     for (i32 num=0;num<13;num++) {
         game_state->dialogue_streams[num] = Mix_LoadWAV(("res/sound/traveled_dialogue" + std::to_string(num+1) + ".mp3").c_str());
     }

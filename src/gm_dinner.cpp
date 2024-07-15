@@ -141,9 +141,13 @@ void UpdateGmDinner(float timestep) {
 
     if (data->hover_object != GmDinnerData::GO_NONE && input->just_pressed[SDL_SCANCODE_E]) {
         if (data->hover_object == GmDinnerData::GO_DOOR) {
-            Mix_PlayChannel(0,game_state->dinner_knock,0);
-            door_pos=hover_obj.pos;
-            door_state = GmDinnerData::DOOR_KNOCKED;
+            if (hover_obj.pos.x!=36 || hover_obj.pos.y!=29) {
+                Mix_PlayChannel(1,game_state->dinner_door_lock,0);
+            } else {
+                Mix_PlayChannel(0,game_state->dinner_knock,0);
+                door_pos=hover_obj.pos;
+                door_state = GmDinnerData::DOOR_KNOCKED;
+            }
         } else if (data->hover_object == GmDinnerData::GO_TV) {
             data->world_objects[GmDinnerData::GO_TV].on ^= 1;
         } else if (data->hover_object == GmDinnerData::GO_CHINA) {
@@ -213,6 +217,8 @@ void UpdateGmDinner(float timestep) {
             if (door_opened_timer >= timer_len) {
                 door_state = GmDinnerData::SPEAK;
                 Mix_PlayChannel(0,game_state->dinner_greeting,0);
+                Mix_PlayMusic(game_state->dinner_jazz_music,-1);
+                Mix_VolumeMusic(80);
                 door_opened_timer=0;
             }
         } else if (door_state == GmDinnerData::SPEAK) {
@@ -392,13 +398,39 @@ void DrawGmDinner() {
 
         game_state->textureShader.UniformColor("colorMod",COLOR_WHITE);
 
+        v2 player = {(float)player_x,(float)player_y};
+
+        // crude and disgusting
+        i32 object_order[GmDinnerData::GO_COUNT];
+        for (i32 ind=0; ind<GmDinnerData::GO_COUNT; ind++) {
+            object_order[ind] = ind;
+        }
+        // this code works but is extremely slow and terrible
+        /*
+        v2 player_line_end = v2({player.x + (float)target_x*1000.f,player.y + (float)target_x*1000.f});
+        for (i32 pos=0; pos<GmDinnerData::GO_COUNT; pos++) {
+            v2 object = data->world_objects[object_order[pos]].pos;
+            double closest_dist = distance_between(player_line_end,object);
+            i32 closest_ind = pos;
+            for (i32 ind=pos+1; ind<GmDinnerData::GO_COUNT; ind++) {
+                double dist = distance_between(player_line_end,world_objects[object_order[ind]].pos);
+                if (dist < closest_dist) {
+                    closest_dist = dist;
+                    closest_ind = ind;
+                }
+            }
+            i32 temp = object_order[closest_ind];
+            object_order[closest_ind] = object_order[pos];
+            object_order[pos] = temp;
+        }
+        */
         for (i32 ind=0;ind<GmDinnerData::GO_COUNT;ind++) {
-            v2 object=world_objects[ind].pos;
+            i32 obj=object_order[ind];
+            v2 object=world_objects[obj].pos;
             // see if the ray collides with the world object, and if there is a wall collision, check if
             // the collision to the object is closer than the collision to the wall
             bool collides = false;
             float width = 2.0f;
-            v2 player = {(float)player_x,(float)player_y};
             v2 line_end = player + v2({(float)target_x,(float)target_y});
             v2 col = closest_point_on_line(player,line_end,object);
             float dist_from_ray_to_obj = distance_between(col,object);
@@ -431,15 +463,15 @@ void DrawGmDinner() {
 
                 double tex_size=0.0;
                 v2i tex_begin={0,0};
-                if (ind == GmDinnerData::GO_TV) {
+                if (obj == GmDinnerData::GO_TV) {
                     tex_size = 128;
                     tex_begin.x = data->world_objects[GmDinnerData::GO_TV].on * (i32)tex_size;
                     game_state->textureShader.Uniform1i("_texture",game_state->dinner_sprites_texture);
-                } else if (ind == GmDinnerData::GO_CHINA) {
+                } else if (obj == GmDinnerData::GO_CHINA) {
                     tex_size = 128;
                     tex_begin = {0,128};
                     game_state->textureShader.Uniform1i("_texture",game_state->dinner_sprites_texture);
-                } else if (ind == GmDinnerData::GO_HOST) {
+                } else if (obj == GmDinnerData::GO_HOST) {
                     tex_size = 640;
                     game_state->textureShader.Uniform1i("_texture",game_state->dinner_host_texture);
                 }
