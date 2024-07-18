@@ -1,5 +1,5 @@
 @echo off
-pushd "C:\dev\Prototypes\engine\build"
+pushd "B:\dev\Prototypes\engine\build"
 REM Optimization switches /O2 /Oi /fp:fast
 REM set CommonCompilerFlags=/O2 /MTd /nologo /fp:fast /Gm- /GR- /EHa /Zo /Oi /WX /W4 /wd4201 /wd4100 /wd4189 /wd4505 /wd4127 /DHANDMADE_INTERNAL=1 /DHANDMADE_SLOW=1 /DHANDMADE_WIN32 /Z7 /FC /F4194304
 REM set CommonLinkerFlags= -incremental:no -opt:ref  user32.lib gdi32.lib winmm.lib

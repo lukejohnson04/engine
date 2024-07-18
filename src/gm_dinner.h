@@ -10,6 +10,16 @@ struct Wobject {
     };
 };
 
+enum TileType {
+    BRICK,
+    YELLOW,
+    DOOR,
+    TRIGGER,
+    INACTIVE_TRIGGER,
+
+    COUNT
+};
+
 struct GmDinnerData {
     int dinner_world_map[DINNER_MAP_WIDTH][DINNER_MAP_HEIGHT];
 
@@ -26,7 +36,11 @@ struct GmDinnerData {
     double host_y=6;
 
     i32 hover_object=-1;
-    
+
+    double timer=0;
+
+    bool can_move=true;
+
     enum {
         GO_TV,
         GO_HOST,
@@ -36,6 +50,23 @@ struct GmDinnerData {
         GO_NONE
     };
     Wobject world_objects[GO_COUNT];
+
+    enum {
+        DOORWAY_BLOCK_SLIDE,
+        DOORWAY_BLOCK_SPEAK,
+        DOORWAY_BLOCK_CHOICE,
+        DOORWAY_BLOCK_LEMME_CHECK_SPEAK,
+        DOORWAY_BLOCK_CHECKING_DOG_TRAVELTO,
+        DOORWAY_BLOCK_CHECKING_DOG,
+        DOORWAY_BLOCK_CHECKING_DOG_TRAVELBACK,
+        DOORWAY_BLOCK_CHECKED_DOG_SPEAK,
+        DOORWAY_BLOCK_NONE
+    } doorway_blocking_state=DOORWAY_BLOCK_SLIDE;
+
+    enum {
+        NONE,
+        BLOCKING_DOORWAY
+    } host_task = NONE;
 
     enum {
         DOOR_CLOSED,

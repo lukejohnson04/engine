@@ -66,6 +66,10 @@ inline bool operator!=(Color left, Color right) {
     return !(left == right);
 }
 
+inline bool operator==(Color left, u32 right) {
+    return left.hex() == right;
+}
+
 
 struct v2 {
     v2(float nx, float ny) : x(nx), y(ny) {}

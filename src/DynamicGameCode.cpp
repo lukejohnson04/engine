@@ -1,5 +1,4 @@
 
-
 #include "core/engine.cpp"
 #include "gm_dinner.h"
 
@@ -154,6 +153,12 @@ struct GameState {
     Mix_Chunk *dinner_no_to_drink;
     Mix_Chunk *dinner_china_interact;
     Mix_Chunk *dinner_door_lock;
+    Mix_Chunk *dinner_dog_whimpering;
+    Mix_Chunk *dinner_block_doorway;
+    Mix_Chunk *dinner_dog_lemme_check;
+    Mix_Chunk *dinner_after_checking_dog;
+    Mix_Chunk *dinner_gunshot;
+    
 
     Mix_Music *dinner_jazz_music;
 
@@ -501,7 +506,6 @@ void LineupIncorrectAudio() {
     Mix_PlayChannel(0,stream,0);
 }
 
-
 void InitializeGameMemory(GameMemory *memory) {
     *game_state = {};
 
@@ -595,6 +599,12 @@ void InitializeGameMemory(GameMemory *memory) {
     game_state->dinner_no_to_drink = Mix_LoadWAV("res/sound/dinner_no_to_drink.ogg");
     game_state->dinner_china_interact = Mix_LoadWAV("res/sound/dinner_china_interact.ogg");
     game_state->dinner_door_lock = Mix_LoadWAV("res/sound/dinner_door_lock.mp3");
+    game_state->dinner_dog_whimpering = Mix_LoadWAV("res/sound/dinner_dog_whimpering.ogg");
+    game_state->dinner_block_doorway = Mix_LoadWAV("res/sound/dinner_block_doorway.ogg");
+    game_state->dinner_dog_lemme_check = Mix_LoadWAV("res/sound/dinner_dog_lemme_check.ogg");
+    game_state->dinner_after_checking_dog = Mix_LoadWAV("res/sound/dinner_after_checking_dog.ogg");
+    game_state->dinner_gunshot = Mix_LoadWAV("res/sound/dinner_gunshot.ogg");
+    
     game_state->dinner_jazz_music = Mix_LoadMUS("res/sound/dinner_jazz_music.mp3");
     
     for (i32 num=0;num<13;num++) {

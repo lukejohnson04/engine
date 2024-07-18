@@ -30,6 +30,11 @@ void InitGmDinner() {
                 game_state->gm_dinner_data.dinner_world_map[y][x] = 2;
             } else if (col == Color({255,100,0,255})) {
                 game_state->gm_dinner_data.dinner_world_map[y][x] = 3;
+            } else if (col == Color({0,0,255,255})) {
+                game_state->gm_dinner_data.dinner_world_map[y][x] = 4;
+            } else if (col == 0x474747ff) {
+                game_state->gm_dinner_data.dinner_world_map[y][x] = 6;
+                printf("Huh\n");
             } else {
                 game_state->gm_dinner_data.dinner_world_map[y][x] = 0;
             }
@@ -37,6 +42,18 @@ void InitGmDinner() {
     }
 
     data->world_objects[GmDinnerData::GO_TV].on = true;
+    //DOGSOUND
+    Mix_PlayChannel(2,game_state->dinner_dog_whimpering,-1);
+}
+
+internal
+void DinnerOnTrigger(v2i pos) {
+    
+}
+
+internal
+void DinnerOnInteract(i32 obj_type,Wobject *object) {
+    
 }
 
 
@@ -67,29 +84,29 @@ void UpdateGmDinner(float timestep) {
     world_objects[GmDinnerData::GO_CHINA].pos = {29.5f,29};
     world_objects[GmDinnerData::GO_HOST].pos = {(float)data->host_x,(float)data->host_y};
 
-    data->hover_object = GmDinnerData::GO_NONE;
-        
+    data->hover_object = GmDinnerData::GO_NONE;        
 
-    
+
     if (input->is_pressed[SDL_SCANCODE_LSHIFT]) {
         move_speed *= 2.0;
         rot_speed *= 2.0;
     }
-    if (input->is_pressed[SDL_SCANCODE_W]) {
-        move_x = dir_x * delta;
-        move_y = dir_y * delta;
-    } if (input->is_pressed[SDL_SCANCODE_S]) {
-        move_x = -dir_x * delta;
-        move_y = -dir_y * delta;
-    } if (input->is_pressed[SDL_SCANCODE_A]) {
-        move_x += -dir_y * delta;
-        move_y += dir_x * delta;
-    } if (input->is_pressed[SDL_SCANCODE_D]) {
-        // move perpendicular
-        move_x += dir_y * delta;
-        move_y += -dir_x * delta;
+    if (data->can_move) {
+        if (input->is_pressed[SDL_SCANCODE_W]) {
+            move_x = dir_x * delta;
+            move_y = dir_y * delta;
+        } if (input->is_pressed[SDL_SCANCODE_S]) {
+            move_x = -dir_x * delta;
+            move_y = -dir_y * delta;
+        } if (input->is_pressed[SDL_SCANCODE_A]) {
+            move_x += -dir_y * delta;
+            move_y += dir_x * delta;
+        } if (input->is_pressed[SDL_SCANCODE_D]) {
+            // move perpendicular
+            move_x += dir_y * delta;
+            move_y += -dir_x * delta;
+        }
     }
-
     struct {
         union {
             v2i pos={0,0};
@@ -157,20 +174,21 @@ void UpdateGmDinner(float timestep) {
     
     move_x *= move_speed;
     move_y *= move_speed;
+
     
     player_y += move_y;
     if (player_y > DINNER_MAP_HEIGHT-1) player_y = DINNER_MAP_HEIGHT-1;
     if (player_y < 0) player_y = 0;
-    if (move_y < 0 && dinner_world_map[(int)player_x][(int)player_y] != 0) {
+    if (move_y < 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 4 && dinner_world_map[(i32)player_x][(i32)player_y] != 5) {
         player_y = ceil(player_y);
-    } else if (move_y > 0 && dinner_world_map[(int)player_x][(int)player_y]) {
+    } else if (move_y > 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 4 && dinner_world_map[(i32)player_x][(i32)player_y] != 5) {
         player_y = floor(player_y) - 0.00001;
     }
-        
+
     player_x += move_x;
-    if (move_x < 0 && dinner_world_map[(int)player_x][(int)player_y] != 0) {
+    if (move_x < 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 0 && data->dinner_world_map[(i32)player_x][(i32)player_y] != 4 && data->dinner_world_map[(i32)player_x][(i32)player_y] != 5) {
         player_x = ceil(player_x);
-    } else if (move_x > 0 && dinner_world_map[(int)player_x][(int)player_y]) {
+    } else if (move_x > 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 0 && data->dinner_world_map[(i32)player_x][(i32)player_y] != 4 && data->dinner_world_map[(i32)player_x][(i32)player_y] != 5) {
         player_x = floor(player_x) - 0.00001;
     }
     if (player_x > DINNER_MAP_WIDTH-1) player_x = DINNER_MAP_WIDTH-1;
@@ -190,6 +208,121 @@ void UpdateGmDinner(float timestep) {
             dir_y = old_dir_x * sin(ROT_SPEED) + dir_y * cos(ROT_SPEED);
         }
     }
+
+    // look for triggers
+    // see if player just entered a trigger
+    v2i ppos_rounded = {(i32)player_x,(i32)player_y};
+    {
+        double block_doorway_startx = 27.5;
+        double block_doorway_starty = 34.5;
+        double block_doorway_endx = 27.5;
+        double block_doorway_endy = 33.5;
+        static i32 travel_point=0;
+        
+        if (dinner_world_map[(i32)player_x][(i32)player_y] == 4) {
+            // disabled trigger
+            dinner_world_map[(i32)player_x][(i32)player_y] = 0;
+            data->host_x = block_doorway_startx;
+            data->host_y = block_doorway_starty;
+            //printf("Entered trigger\n");
+            data->host_task = GmDinnerData::BLOCKING_DOORWAY;
+            data->doorway_blocking_state = GmDinnerData::DOORWAY_BLOCK_SLIDE;
+            data->timer = 0;
+        }
+
+        if (data->host_task == GmDinnerData::BLOCKING_DOORWAY) {
+            data->can_move = false;
+            data->timer += timestep;
+            if (data->doorway_blocking_state == GmDinnerData::DOORWAY_BLOCK_SLIDE) {
+                double timer_len = 0.5;
+                v2 dir = {(float)(block_doorway_endx - block_doorway_startx),(float)(block_doorway_endy-block_doorway_starty)};
+                dir = dir.normalize();
+                dir *= (float)(data->timer / timer_len);
+                data->host_x = block_doorway_startx+dir.x;
+                data->host_y = block_doorway_starty+dir.y;
+                if (data->timer > 0.5) {
+                    data->timer = 0.0;
+                    data->host_x = block_doorway_endx;
+                    data->host_y = block_doorway_endy;
+                    data->doorway_blocking_state = GmDinnerData::DOORWAY_BLOCK_SPEAK;
+                    Mix_PlayChannel(0,game_state->dinner_block_doorway,0);
+                }
+            } else if (data->doorway_blocking_state == GmDinnerData::DOORWAY_BLOCK_SPEAK) {
+                if (Mix_Playing(0) == false) {
+                    data->doorway_blocking_state = GmDinnerData::DOORWAY_BLOCK_CHOICE;
+                }
+            } else if (data->doorway_blocking_state == GmDinnerData::DOORWAY_BLOCK_CHOICE) {
+                data->doorway_blocking_state = GmDinnerData::DOORWAY_BLOCK_LEMME_CHECK_SPEAK;
+                Mix_PlayChannel(0,game_state->dinner_dog_lemme_check,0);
+            } else if (data->doorway_blocking_state == GmDinnerData::DOORWAY_BLOCK_LEMME_CHECK_SPEAK) {
+                if (Mix_Playing(0) == false) {
+                    data->doorway_blocking_state = GmDinnerData::DOORWAY_BLOCK_CHECKING_DOG_TRAVELTO;
+                    travel_point=0;
+                }
+            } else if (data->doorway_blocking_state == GmDinnerData::DOORWAY_BLOCK_CHECKING_DOG_TRAVELTO || data->doorway_blocking_state == GmDinnerData::DOORWAY_BLOCK_CHECKING_DOG_TRAVELBACK) {
+                v2 points[] = {{(float)block_doorway_endx,(float)block_doorway_endy},{25.5,33.5},{25.5,37.5}};
+                v2 host = {(float)data->host_x,(float)data->host_y};
+                if (distance_between(host,v2((float)points[travel_point].x,(float)points[travel_point].y)) < 0.1) {
+                    bool travelto = data->doorway_blocking_state == GmDinnerData::DOORWAY_BLOCK_CHECKING_DOG_TRAVELTO;
+                    if (travelto) {
+                        travel_point++;
+                    } else {
+                        travel_point--;
+                    }
+                    if (travel_point >= 3) {
+                        data->doorway_blocking_state = GmDinnerData::DOORWAY_BLOCK_CHECKING_DOG;
+                        data->timer = 0.0;
+                    } else if (travel_point < 0) {
+                        data->doorway_blocking_state = GmDinnerData::DOORWAY_BLOCK_CHECKED_DOG_SPEAK;
+                        Mix_PlayChannel(0,game_state->dinner_after_checking_dog,0);
+                    }
+                } else {
+                    v2 vec = vec_to(host,v2((float)points[travel_point].x,(float)points[travel_point].y)) * timestep * 2.5;
+                    data->host_x += (double)vec.x;
+                    data->host_y += (double)vec.y;
+                }
+            } else if (data->doorway_blocking_state == GmDinnerData::DOORWAY_BLOCK_CHECKING_DOG) {
+                static bool played_gunshot=false;
+                if (data->timer > 5) {
+                    data->doorway_blocking_state = GmDinnerData::DOORWAY_BLOCK_CHECKING_DOG_TRAVELBACK;
+                    travel_point = 2;
+                } else {
+                    if (Mix_Playing(0) == false && !played_gunshot) {
+                        if (data->timer >= 2.0) {
+                            played_gunshot=true;
+                            Mix_PlayChannel(0,game_state->dinner_gunshot,0);
+                            Mix_HaltChannel(2);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // spatial audio for dog whimpering
+    v2 dogpos = {25,37};
+    float angle_rad = angle_to(player,dogpos) - PIf/2;
+    i16 angle = (i16)rad_2_deg(angle_rad);
+
+    float dist = distance_between(player, dogpos);
+
+    v2 dir = {(float)dir_x,(float)dir_y};
+    angle = (i16)rad_2_deg(vec_to_angle(dir));
+
+    float min_volume=0.0f;
+    float max_volume=0.85f;
+    float min_volume_radius=10.0f;
+    float max_volume_radius=0.f;
+
+    if (dist < min_volume_radius) {
+        dist /= min_volume_radius;
+
+        Mix_SetPosition(2, angle, u8(dist*255.f));
+        Mix_VolumeChunk(game_state->dinner_dog_whimpering,128);
+    } else {
+        Mix_VolumeChunk(game_state->dinner_dog_whimpering,0);
+    }
+    //printf("%f\n",dist);
     
     // update world
     if (door_state != GmDinnerData::DOOR_CLOSED) {
@@ -218,7 +351,7 @@ void UpdateGmDinner(float timestep) {
                 door_state = GmDinnerData::SPEAK;
                 Mix_PlayChannel(0,game_state->dinner_greeting,0);
                 Mix_PlayMusic(game_state->dinner_jazz_music,-1);
-                Mix_VolumeMusic(80);
+                Mix_VolumeMusic(40);
                 door_opened_timer=0;
             }
         } else if (door_state == GmDinnerData::SPEAK) {
@@ -229,10 +362,6 @@ void UpdateGmDinner(float timestep) {
                 data->text_no = generate_text_obj(game_state->font,"no",COLOR_WHITE,0);
                 data->text_yes.position = {NATIVE_GAME_WIDTH/2 - NATIVE_GAME_WIDTH/5 - data->text_yes.get_draw_rect().w/2,NATIVE_GAME_HEIGHT/2 + NATIVE_GAME_HEIGHT/5};
                 data->text_no.position = {NATIVE_GAME_WIDTH/2 + NATIVE_GAME_WIDTH/5 - data->text_yes.get_draw_rect().w/2,NATIVE_GAME_HEIGHT/2 + NATIVE_GAME_HEIGHT/5};
-                /*glGenTextures(1,&data->text_yes);
-                glGenTextures(1,&data->text_no);
-                generate_text(data->text_yes,game_state->font,"yes",COLOR_WHITE,0);
-                generate_text(data->text_no,game_state->font,"no",COLOR_WHITE,0);*/
             }
         }
     } if (data->gameplay_state == GmDinnerData::CHOICE) {
@@ -291,6 +420,30 @@ void DrawGmDinner() {
     game_state->textureShader.UniformM4fv("projection",game_state->projection);
     game_state->textureShader.UniformM4fv("model",glm::mat4(1.0f));
 
+    // crude and disgusting
+    i32 object_order[GmDinnerData::GO_COUNT];
+    for (i32 ind=0; ind<GmDinnerData::GO_COUNT; ind++) {
+        object_order[ind] = ind;
+    }
+    v2 player = {(float)player_x,(float)player_y};
+    // this code works but is extremely slow and terrible
+    for (i32 pos=0; pos<GmDinnerData::GO_COUNT; pos++) {
+        v2 object = data->world_objects[object_order[pos]].pos;
+        double closest_dist = distance_between(player,object);
+        i32 closest_ind = pos;
+        for (i32 ind=pos+1; ind<GmDinnerData::GO_COUNT; ind++) {
+            double dist = distance_between(player,world_objects[object_order[ind]].pos);
+            if (dist > closest_dist) {
+                closest_dist = dist;
+                closest_ind = ind;
+            }
+        }
+        i32 temp = object_order[closest_ind];
+        object_order[closest_ind] = object_order[pos];
+        object_order[pos] = temp;
+    }
+
+    
     // go through every verticle stripe and cast a ray in that direction, outwards from the player
     for (int x=0; x<NATIVE_GAME_WIDTH; x++) {
         double normalized_coord = (2 * x) / ((double)(NATIVE_GAME_WIDTH)) - 1.0;
@@ -347,7 +500,7 @@ void DrawGmDinner() {
             }
             if (map_x < 0 || map_x >= DINNER_MAP_WIDTH || map_y < 0 || map_y >= DINNER_MAP_HEIGHT)
                 break;
-            if (data->dinner_world_map[map_x][map_y] != 0) {
+            if (data->dinner_world_map[map_x][map_y] != 0 && data->dinner_world_map[map_x][map_y] != 4 && data->dinner_world_map[map_x][map_y] != 5) {
                 collision = data->dinner_world_map[map_x][map_y];
                 break;
             }
@@ -378,6 +531,9 @@ void DrawGmDinner() {
                 src_rect = {0,0,32,32};
             } else if (collision == 3) {
                 src_rect = {64,0,32,32};                
+            } else if (collision == 6) {
+                src_rect = {160,0,32,32};
+                printf("WTF\n");
             }
             texture_x_coord = int(col_x * (double)src_rect.w);
 
@@ -398,32 +554,6 @@ void DrawGmDinner() {
 
         game_state->textureShader.UniformColor("colorMod",COLOR_WHITE);
 
-        v2 player = {(float)player_x,(float)player_y};
-
-        // crude and disgusting
-        i32 object_order[GmDinnerData::GO_COUNT];
-        for (i32 ind=0; ind<GmDinnerData::GO_COUNT; ind++) {
-            object_order[ind] = ind;
-        }
-        // this code works but is extremely slow and terrible
-        /*
-        v2 player_line_end = v2({player.x + (float)target_x*1000.f,player.y + (float)target_x*1000.f});
-        for (i32 pos=0; pos<GmDinnerData::GO_COUNT; pos++) {
-            v2 object = data->world_objects[object_order[pos]].pos;
-            double closest_dist = distance_between(player_line_end,object);
-            i32 closest_ind = pos;
-            for (i32 ind=pos+1; ind<GmDinnerData::GO_COUNT; ind++) {
-                double dist = distance_between(player_line_end,world_objects[object_order[ind]].pos);
-                if (dist < closest_dist) {
-                    closest_dist = dist;
-                    closest_ind = ind;
-                }
-            }
-            i32 temp = object_order[closest_ind];
-            object_order[closest_ind] = object_order[pos];
-            object_order[pos] = temp;
-        }
-        */
         for (i32 ind=0;ind<GmDinnerData::GO_COUNT;ind++) {
             i32 obj=object_order[ind];
             v2 object=world_objects[obj].pos;
@@ -497,7 +627,7 @@ void DrawGmDinner() {
         GL_DrawTexture({0,0,0,0},data->text_no.get_draw_rect());
     }
     
-    if (data->hover_object != GmDinnerData::GO_NONE) {
+    if (data->hover_object != GmDinnerData::GO_NONE && data->hover_object != GmDinnerData::GO_HOST) {
         game_state->textureShader.Uniform1i("_texture",game_state->dinner_mouse_icons_texture);
         i32 size = 32;
         iRect src_rect = {0,0,16,16};

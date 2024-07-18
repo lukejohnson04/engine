@@ -28,7 +28,7 @@
 (setq casey-font "outline-DejaVu Sans Mono")
 
 (when casey-win32 
-  (setq casey-makescript "c:/dev/Prototypes/engine/build/build.bat")
+  (setq casey-makescript "b:/dev/Prototypes/engine/build/build.bat")
   (setq casey-font "outline-Liberation Mono")
 )
 
