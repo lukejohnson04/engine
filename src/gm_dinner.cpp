@@ -34,7 +34,6 @@ void InitGmDinner() {
                 game_state->gm_dinner_data.dinner_world_map[y][x] = 4;
             } else if (col == 0x474747ff) {
                 game_state->gm_dinner_data.dinner_world_map[y][x] = 6;
-                printf("Huh\n");
             } else {
                 game_state->gm_dinner_data.dinner_world_map[y][x] = 0;
             }
@@ -487,28 +486,135 @@ void DrawGmDinner() {
             side_dist_y = (player_y - map_y) * delta_dist_y;
         }
 
-        while (!collision) {
+        double perp_distance = 0.0;
+        double prev_wall_height=0;
+        i32 prev_wall_top=0;
+        i32 collision_count=0;
+
+        bool just_collided=false;
+        while (true) {
             // the side_dist_x/y variables are incremented throughout the DDA
             if (side_dist_x < side_dist_y) {
                 side_dist_x += delta_dist_x;
-                map_x += step_x;
+                if (just_collided == false)
+                    map_x += step_x;
                 side = 0;
             } else {
                 side_dist_y += delta_dist_y;
-                map_y += step_y;
+                if (just_collided == false)
+                    map_y += step_y;
                 side = 1;
             }
             if (map_x < 0 || map_x >= DINNER_MAP_WIDTH || map_y < 0 || map_y >= DINNER_MAP_HEIGHT)
                 break;
-            if (data->dinner_world_map[map_x][map_y] != 0 && data->dinner_world_map[map_x][map_y] != 4 && data->dinner_world_map[map_x][map_y] != 5) {
+            if (just_collided || (data->dinner_world_map[map_x][map_y] != 0 && data->dinner_world_map[map_x][map_y] != 4 && data->dinner_world_map[map_x][map_y] != 5)) {
+                // collision
                 collision = data->dinner_world_map[map_x][map_y];
-                break;
+
+                double col_x;
+                int texture_x_coord;
+
+                if (side == 0) {
+                    perp_distance = side_dist_x - delta_dist_x;
+                    col_x = player_y + perp_distance * target_y;
+                } else {
+                    perp_distance = side_dist_y - delta_dist_y;
+                    col_x = player_x + perp_distance * target_x;
+                }
+
+                col_x -= floor(col_x);
+
+                GLuint texture = game_state->dinner_tiles_texture;
+
+                double wall_height=1.0;
+                iRect src_rect = {0,0,32,32};
+                if (collision == 1) {
+                    src_rect = {96,0,32,32};
+                } else if (collision == 2) {
+                    src_rect = {0,0,32,32};
+                } else if (collision == 3) {
+                    src_rect = {64,0,32,32};
+                } else if (collision == 6) {
+                    src_rect = {160,0,32,32};
+                    wall_height = 0.4;
+                }
+                texture_x_coord = int(col_x * (double)src_rect.w);
+
+                double full_wall_height = (NATIVE_GAME_HEIGHT/perp_distance);
+                double projected_wall_height = (full_wall_height * wall_height);
+
+                i32 wall_bottom, wall_top;
+
+                wall_bottom = (i32)(NATIVE_GAME_HEIGHT/2+full_wall_height/2.0);
+                wall_top = (i32)(wall_bottom - projected_wall_height);
+                
+                if (collision_count) {
+                    wall_bottom = MIN(wall_bottom,prev_wall_top);
+                }
+
+                // render top of wall
+                if (just_collided) {
+                    iRect rect = {x,(i32)(wall_top),1,(i32)(prev_wall_top-wall_top)};
+                    prev_wall_top = (i32)floor(wall_top);
+
+                    UseShader(&game_state->colorShader);
+                    
+                    double min_dist = 6.0;
+                    double max_dist = data->max_view_distance;
+                    double dist_val = (max_dist - MAX(0,perp_distance - min_dist)) / max_dist;
+                    dist_val = MAX(0,dist_val);
+                    u8 dist_col = (u8)(dist_val * 255);
+                    dist_col = MAX(dist_col,35);
+
+                    Color col = Color(0,0,(u8)((dist_col/255.0) * 255),255);
+
+                    game_state->colorShader.UniformColor("color",col);
+                    
+                    GL_DrawRect(rect);
+                    UseShader(&game_state->textureShader);
+                    
+                } else {
+                    i32 absolute_wall_height = wall_bottom-wall_top;
+                    double percentage_visible = (double)absolute_wall_height / (double)projected_wall_height;
+                    i32 src_height = (i32)(src_rect.h * percentage_visible);
+                    iRect rect = {x,wall_top,1,absolute_wall_height};
+                    src_rect = {src_rect.x+texture_x_coord,src_rect.y,1,src_height};
+
+                    game_state->textureShader.Uniform1i("_texture",texture);
+
+                    double min_dist = 6.0;
+                    double max_dist = data->max_view_distance;
+                    double dist_val = (max_dist - MAX(0,perp_distance - min_dist)) / max_dist;
+                    dist_val = MAX(0,dist_val);
+                    u8 dist_col = (u8)(dist_val * 255);
+                    dist_col = MAX(dist_col,35);
+                    game_state->textureShader.UniformColor("colorMod",Color(dist_col,dist_col,dist_col,255));
+                    GL_DrawTexture(src_rect,rect);                
+                }
+
+                prev_wall_height = wall_height;
+                prev_wall_top = wall_top;
+                collision_count++;
+
+                if (wall_height == 1.0) {
+                    break;
+                }
+                if (just_collided) {
+                    just_collided = false;
+                    if (side == 0) {
+                        side_dist_x -= delta_dist_x;
+                    } else {
+                        side_dist_y -= delta_dist_y;
+                    }
+                } else {
+                    just_collided = true;
+                }
+            } else {
+                just_collided = false;
             }
         }
 
-
-        double perp_distance = 0.0;
-
+        /*
         if (collision) {
             double col_x;
             int texture_x_coord;
@@ -524,21 +630,28 @@ void DrawGmDinner() {
 
             GLuint texture = game_state->dinner_tiles_texture;
 
+            double wall_height=1.0;
             iRect src_rect = {0,0,32,32};
             if (collision == 1) {
                 src_rect = {96,0,32,32};
             } else if (collision == 2) {
                 src_rect = {0,0,32,32};
             } else if (collision == 3) {
-                src_rect = {64,0,32,32};                
+                src_rect = {64,0,32,32};
             } else if (collision == 6) {
                 src_rect = {160,0,32,32};
+                wall_height = 0.2;
                 printf("WTF\n");
             }
             texture_x_coord = int(col_x * (double)src_rect.w);
+            //src_rect.y = (i32)((1.0 - last_rendered_height) * src_rect.h);
+            src_rect.h = (i32)((1.0 - last_rendered_height) * src_rect.h);
 
-            int wall_height = (int)(NATIVE_GAME_HEIGHT/perp_distance);
-            iRect rect = {x,(NATIVE_GAME_HEIGHT-wall_height)/2,1,wall_height};
+            int full_wall_height = (int)(NATIVE_GAME_HEIGHT/perp_distance);
+            int projected_wall_height = (int)((NATIVE_GAME_HEIGHT/perp_distance) * wall_height);
+            i32 wall_bottom = (NATIVE_GAME_HEIGHT/2+full_wall_height/2);
+            i32 wall_top = wall_bottom - projected_wall_height;
+            iRect rect = {x,wall_top,1,wall_bottom-wall_top};
             src_rect = {src_rect.x + (int)(texture_x_coord),0,1,src_rect.h};
             game_state->textureShader.Uniform1i("_texture",texture);
 
@@ -550,7 +663,10 @@ void DrawGmDinner() {
             dist_col = MAX(dist_col,35);
             game_state->textureShader.UniformColor("colorMod",Color(dist_col,dist_col,dist_col,255));
             GL_DrawTexture(src_rect,rect);
+            
+            last_rendered_height = wall_height;
         }
+        */
 
         game_state->textureShader.UniformColor("colorMod",COLOR_WHITE);
 
