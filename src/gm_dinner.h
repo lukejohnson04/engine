@@ -40,6 +40,7 @@ struct GmDinnerData {
     double timer=0;
 
     bool can_move=true;
+    bool no_clip=false;
 
     enum {
         GO_TV,
@@ -47,6 +48,7 @@ struct GmDinnerData {
         GO_CHINA,
         GO_COUNT,
         GO_DOOR,
+        GO_WRENCH,
         GO_NONE
     };
     Wobject world_objects[GO_COUNT];

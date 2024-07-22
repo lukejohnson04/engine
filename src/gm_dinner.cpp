@@ -34,6 +34,8 @@ void InitGmDinner() {
                 game_state->gm_dinner_data.dinner_world_map[y][x] = 4;
             } else if (col == 0x474747ff) {
                 game_state->gm_dinner_data.dinner_world_map[y][x] = 6;
+            } else if (col == 0x621a00ff) {
+                game_state->gm_dinner_data.dinner_world_map[y][x] = 7;
             } else {
                 game_state->gm_dinner_data.dinner_world_map[y][x] = 0;
             }
@@ -82,14 +84,21 @@ void UpdateGmDinner(float timestep) {
     world_objects[GmDinnerData::GO_TV].pos = {30,25.5f};
     world_objects[GmDinnerData::GO_CHINA].pos = {29.5f,29};
     world_objects[GmDinnerData::GO_HOST].pos = {(float)data->host_x,(float)data->host_y};
+    world_objects[GmDinnerData::GO_WRENCH].pos = {34.f,32.f};
+    //world_objects[GmDinnerData::GO_WRENCH].ypos = 0.5f;
+    
 
     data->hover_object = GmDinnerData::GO_NONE;        
-
 
     if (input->is_pressed[SDL_SCANCODE_LSHIFT]) {
         move_speed *= 2.0;
         rot_speed *= 2.0;
     }
+
+    if (input->just_pressed[SDL_SCANCODE_R]) {
+        data->no_clip = !data->no_clip;
+    }
+
     if (data->can_move) {
         if (input->is_pressed[SDL_SCANCODE_W]) {
             move_x = dir_x * delta;
@@ -178,20 +187,24 @@ void UpdateGmDinner(float timestep) {
     player_y += move_y;
     if (player_y > DINNER_MAP_HEIGHT-1) player_y = DINNER_MAP_HEIGHT-1;
     if (player_y < 0) player_y = 0;
-    if (move_y < 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 4 && dinner_world_map[(i32)player_x][(i32)player_y] != 5) {
-        player_y = ceil(player_y);
-    } else if (move_y > 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 4 && dinner_world_map[(i32)player_x][(i32)player_y] != 5) {
-        player_y = floor(player_y) - 0.00001;
+    if (!data->no_clip) {
+        if (move_y < 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 4 && dinner_world_map[(i32)player_x][(i32)player_y] != 5) {
+            player_y = ceil(player_y);
+        } else if (move_y > 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 4 && dinner_world_map[(i32)player_x][(i32)player_y] != 5) {
+            player_y = floor(player_y) - 0.00001;
+        }
     }
 
     player_x += move_x;
-    if (move_x < 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 0 && data->dinner_world_map[(i32)player_x][(i32)player_y] != 4 && data->dinner_world_map[(i32)player_x][(i32)player_y] != 5) {
-        player_x = ceil(player_x);
-    } else if (move_x > 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 0 && data->dinner_world_map[(i32)player_x][(i32)player_y] != 4 && data->dinner_world_map[(i32)player_x][(i32)player_y] != 5) {
-        player_x = floor(player_x) - 0.00001;
-    }
     if (player_x > DINNER_MAP_WIDTH-1) player_x = DINNER_MAP_WIDTH-1;
     if (player_x < 0) player_x = 0;
+    if (!data->no_clip) {
+        if (move_x < 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 0 && data->dinner_world_map[(i32)player_x][(i32)player_y] != 4 && data->dinner_world_map[(i32)player_x][(i32)player_y] != 5) {
+            player_x = ceil(player_x);
+        } else if (move_x > 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 0 && data->dinner_world_map[(i32)player_x][(i32)player_y] != 4 && data->dinner_world_map[(i32)player_x][(i32)player_y] != 5) {
+            player_x = floor(player_x) - 0.00001;
+        }
+    }
 
     if (input->is_pressed[SDL_SCANCODE_LEFT] || input->is_pressed[SDL_SCANCODE_RIGHT]) {
         double ROT_SPEED = rot_speed * (input->is_pressed[SDL_SCANCODE_LEFT] ? 1 : -1);
@@ -223,7 +236,6 @@ void UpdateGmDinner(float timestep) {
             dinner_world_map[(i32)player_x][(i32)player_y] = 0;
             data->host_x = block_doorway_startx;
             data->host_y = block_doorway_starty;
-            //printf("Entered trigger\n");
             data->host_task = GmDinnerData::BLOCKING_DOORWAY;
             data->doorway_blocking_state = GmDinnerData::DOORWAY_BLOCK_SLIDE;
             data->timer = 0;
@@ -492,6 +504,7 @@ void DrawGmDinner() {
         i32 collision_count=0;
 
         bool just_collided=false;
+
         while (true) {
             // the side_dist_x/y variables are incremented throughout the DDA
             if (side_dist_x < side_dist_y) {
@@ -522,6 +535,7 @@ void DrawGmDinner() {
                     col_x = player_x + perp_distance * target_x;
                 }
 
+
                 col_x -= floor(col_x);
 
                 GLuint texture = game_state->dinner_tiles_texture;
@@ -536,8 +550,11 @@ void DrawGmDinner() {
                     src_rect = {64,0,32,32};
                 } else if (collision == 6) {
                     src_rect = {160,0,32,32};
-                    wall_height = 0.4;
+                } else if (collision == 7) {
+                    src_rect = {192,20,32,12};
+                    wall_height = 12.0 / 32.0;
                 }
+
                 texture_x_coord = int(col_x * (double)src_rect.w);
 
                 double full_wall_height = (NATIVE_GAME_HEIGHT/perp_distance);
@@ -545,17 +562,20 @@ void DrawGmDinner() {
 
                 i32 wall_bottom, wall_top;
 
-                wall_bottom = (i32)(NATIVE_GAME_HEIGHT/2+full_wall_height/2.0);
+                wall_bottom = (i32)(NATIVE_GAME_HEIGHT/2.0+full_wall_height/2.0);
                 wall_top = (i32)(wall_bottom - projected_wall_height);
-                
+
+                bool continuation = false;
                 if (collision_count) {
-                    wall_bottom = MIN(wall_bottom,prev_wall_top);
+                    if (prev_wall_top < wall_bottom) {
+                        wall_bottom = prev_wall_top;
+                        continuation = true;
+                    }
                 }
 
                 // render top of wall
                 if (just_collided) {
                     iRect rect = {x,(i32)(wall_top),1,(i32)(prev_wall_top-wall_top)};
-                    prev_wall_top = (i32)floor(wall_top);
 
                     UseShader(&game_state->colorShader);
                     
@@ -576,8 +596,17 @@ void DrawGmDinner() {
                 } else {
                     i32 absolute_wall_height = wall_bottom-wall_top;
                     double percentage_visible = (double)absolute_wall_height / (double)projected_wall_height;
+                    if (percentage_visible > 1) {
+                        percentage_visible = MIN(percentage_visible,1);
+                    }
+                    if (!continuation) {
+                        percentage_visible = 1.0;
+                    }
                     i32 src_height = (i32)(src_rect.h * percentage_visible);
                     iRect rect = {x,wall_top,1,absolute_wall_height};
+                    if (src_height > src_rect.h) {
+                        //printf("%d\n",src_height);
+                    }
                     src_rect = {src_rect.x+texture_x_coord,src_rect.y,1,src_height};
 
                     game_state->textureShader.Uniform1i("_texture",texture);
@@ -720,6 +749,10 @@ void DrawGmDinner() {
                 } else if (obj == GmDinnerData::GO_HOST) {
                     tex_size = 640;
                     game_state->textureShader.Uniform1i("_texture",game_state->dinner_host_texture);
+                } else if (obj == GmDinnerData::GO_WRENCH) {
+                    tex_size = 128;
+                    tex_begin = {0,384};
+                    game_state->textureShader.Uniform1i("_texture",game_state->dinner_host_texture);
                 }
                 int texture_x_coord = int(tex_begin.x + col_x * tex_size);
 
@@ -728,7 +761,14 @@ void DrawGmDinner() {
                 // replace this with the height of the distance from the player to the center of the object
                 // that way the height is constant for all angles
                 int wall_height = (int)(NATIVE_GAME_WIDTH/dist_to_obj);
-                iRect rect = {x,(NATIVE_GAME_HEIGHT-wall_height)/2,1,wall_height};
+                double tile_height = 12.0 / 32.0;
+
+                double full_tile_height = (NATIVE_GAME_HEIGHT/dist_to_obj);
+                double projected_tile_height = (full_tile_height * tile_height);
+                i32 tile_bottom = (i32)(NATIVE_GAME_HEIGHT/2.0+full_tile_height/2.0);
+                i32 tile_top = (i32)(tile_bottom - projected_tile_height);
+
+                iRect rect = {x,tile_top-wall_height,1,wall_height};
                 iRect src_rect = {(int)(texture_x_coord),tex_begin.y,1,(i32)tex_size};
                 GL_DrawTexture(src_rect,rect);
             }

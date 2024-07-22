@@ -3,7 +3,7 @@
 #include "gm_dinner.h"
 
 #define WINDOW_WIDTH 720
-#define WINDOW_HEIGHT 540
+#define WINDOW_HEIGHT 240
 
 #define NATIVE_GAME_WIDTH 240
 #define NATIVE_GAME_HEIGHT 180
