@@ -16,11 +16,17 @@ v2 closest_point_on_line(v2 l1, v2 l2, v2 point) {
     return ans;
 }
 
+iRect scrollbar_full = {NATIVE_GAME_WIDTH-8-8,20,8,NATIVE_GAME_HEIGHT-64};
+
+
 void InitGmDinner() {
     GmDinnerData *data = &game_state->gm_dinner_data;
+    
     SDL_Surface *house_layout_surface = IMG_Load("res/imgs/dinner_house.png");
     for (i32 x=0; x<DINNER_MAP_WIDTH; x++) {
         for (i32 y=0; y<DINNER_MAP_HEIGHT; y++) {
+            game_state->gm_dinner_data.dinner_world_map[y][x] = 0;
+
             Color col = {0,0,0,0};
             Uint32 pixel = getpixel(house_layout_surface,x,y);
             SDL_GetRGBA(pixel, house_layout_surface->format, &col.r, &col.g, &col.b, &col.a);
@@ -36,6 +42,17 @@ void InitGmDinner() {
                 game_state->gm_dinner_data.dinner_world_map[y][x] = 6;
             } else if (col == 0x621a00ff) {
                 game_state->gm_dinner_data.dinner_world_map[y][x] = 7;
+            } else if (col == 0xd100ffff) {
+                game_state->gm_dinner_data.dinner_world_map[y][x] = 8;
+            } else if (col == 0x69251aff) {
+                game_state->gm_dinner_data.dinner_world_map[y][x] = 9;
+            } else if (col == 0xa83700ff) {
+                game_state->gm_dinner_data.dinner_world_map[y][x] = 10;
+            } else if (col == 0xffff00ff) {
+                game_state->gm_dinner_data.dinner_world_map[y][x] = 11;
+            } else if (col == 0xff00ffff) {
+                game_state->gm_dinner_data.dinner_world_map[y][x] = 12;
+                printf("huh\n");
             } else {
                 game_state->gm_dinner_data.dinner_world_map[y][x] = 0;
             }
@@ -43,6 +60,13 @@ void InitGmDinner() {
     }
 
     data->world_objects[GmDinnerData::GO_TV].on = true;
+
+    data->world_objects[GmDinnerData::GO_TV].pos = {30,25.5f};
+    data->world_objects[GmDinnerData::GO_CHINA].pos = {29.5f,29};
+    data->world_objects[GmDinnerData::GO_WRENCH].pos = {34.5f,32.5f};
+    data->world_objects[GmDinnerData::GO_YAHTZEE].pos = {25.5f,30.5f};
+    data->world_objects[GmDinnerData::GO_AQUARIUM].pos = {31.f,36.5f};
+    
     //DOGSOUND
     Mix_PlayChannel(2,game_state->dinner_dog_whimpering,-1);
 }
@@ -55,6 +79,28 @@ void DinnerOnTrigger(v2i pos) {
 internal
 void DinnerOnInteract(i32 obj_type,Wobject *object) {
     
+}
+
+internal
+bool DinnerChoice(iRect rect) {
+    if (input->mouse_just_pressed) {
+        v2i mpos = GetMousePositionIngame();
+        if (rect_contains_point(rect,mpos)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+internal
+void DinnerDebugLoad() {
+    InitGmDinner();
+    GmDinnerData *data = &game_state->gm_dinner_data;
+    data->player_x = 30;
+    data->player_y = 28;
+    data->host_x = 30;
+    data->host_y = 27;
+    data->host_task = GmDinnerData::WAITING_FOR_MILKSHAKE;
 }
 
 
@@ -80,15 +126,17 @@ void UpdateGmDinner(float timestep) {
     static v2i door_pos = {0,0};
 
     auto &world_objects = data->world_objects;
-
-    world_objects[GmDinnerData::GO_TV].pos = {30,25.5f};
-    world_objects[GmDinnerData::GO_CHINA].pos = {29.5f,29};
     world_objects[GmDinnerData::GO_HOST].pos = {(float)data->host_x,(float)data->host_y};
-    world_objects[GmDinnerData::GO_WRENCH].pos = {34.f,32.f};
     //world_objects[GmDinnerData::GO_WRENCH].ypos = 0.5f;
     
 
-    data->hover_object = GmDinnerData::GO_NONE;        
+    data->hover_object = GmDinnerData::GO_NONE;
+
+#ifdef DEBUG
+    if (input->just_pressed[SDL_SCANCODE_V]) {
+        InitGmDinner();
+    }
+#endif
 
     if (input->is_pressed[SDL_SCANCODE_LSHIFT]) {
         move_speed *= 2.0;
@@ -120,7 +168,8 @@ void UpdateGmDinner(float timestep) {
             v2i pos={0,0};
         };
     } hover_obj;
-    
+
+    const double PLAYER_RADIUS = 0.125;
     v2 player = {(float)player_x,(float)player_y};
     {
         // loop through and see what was interacted with
@@ -164,6 +213,7 @@ void UpdateGmDinner(float timestep) {
         }
     }
 
+    // on interact
     if (data->hover_object != GmDinnerData::GO_NONE && input->just_pressed[SDL_SCANCODE_E]) {
         if (data->hover_object == GmDinnerData::GO_DOOR) {
             if (hover_obj.pos.x!=36 || hover_obj.pos.y!=29) {
@@ -171,18 +221,30 @@ void UpdateGmDinner(float timestep) {
             } else {
                 Mix_PlayChannel(0,game_state->dinner_knock,0);
                 door_pos=hover_obj.pos;
+                data->host_task = GmDinnerData::GETTING_DOOR;
                 door_state = GmDinnerData::DOOR_KNOCKED;
             }
         } else if (data->hover_object == GmDinnerData::GO_TV) {
             data->world_objects[GmDinnerData::GO_TV].on ^= 1;
         } else if (data->hover_object == GmDinnerData::GO_CHINA) {
             Mix_PlayChannel(0,game_state->dinner_china_interact,0);
+        } else if (data->hover_object == GmDinnerData::GO_YAHTZEE) {
+            
+        } else if (data->hover_object == GmDinnerData::GO_HOST && data->can_interact_with_host) {
+            if (data->host_task == GmDinnerData::WAITING_FOR_MILKSHAKE) {
+                data->host_milkshake_state = GmDinnerData::MK_INITIAL_SPEAK;
+                data->can_interact_with_host = false;
+                Mix_PlayChannel(0,game_state->dinner_give_milkshake,0);
+            }
         }
+    }
+
+    if (input->just_pressed[SDL_SCANCODE_GRAVE]) {
+        DinnerDebugLoad();
     }
     
     move_x *= move_speed;
     move_y *= move_speed;
-
     
     player_y += move_y;
     if (player_y > DINNER_MAP_HEIGHT-1) player_y = DINNER_MAP_HEIGHT-1;
@@ -241,6 +303,7 @@ void UpdateGmDinner(float timestep) {
             data->timer = 0;
         }
 
+        // update host
         if (data->host_task == GmDinnerData::BLOCKING_DOORWAY) {
             data->can_move = false;
             data->timer += timestep;
@@ -293,7 +356,7 @@ void UpdateGmDinner(float timestep) {
                     data->host_y += (double)vec.y;
                 }
             } else if (data->doorway_blocking_state == GmDinnerData::DOORWAY_BLOCK_CHECKING_DOG) {
-                static bool played_gunshot=false;
+                local_persist bool played_gunshot=false;
                 if (data->timer > 5) {
                     data->doorway_blocking_state = GmDinnerData::DOORWAY_BLOCK_CHECKING_DOG_TRAVELBACK;
                     travel_point = 2;
@@ -305,6 +368,194 @@ void UpdateGmDinner(float timestep) {
                             Mix_HaltChannel(2);
                         }
                     }
+                }
+            } else if (data->doorway_blocking_state == GmDinnerData::DOORWAY_BLOCK_CHECKED_DOG_SPEAK) {
+                if (Mix_Playing(0) == false) {
+                    data->host_task = GmDinnerData::WAITING_FOR_MILKSHAKE;
+                    data->host_milkshake_state = GmDinnerData::MK_TRAVELLING_TO_WAIT;
+                    data->can_move = true;
+                }
+            }
+        } else if (data->host_task == GmDinnerData::WAITING_FOR_MILKSHAKE) {
+            if (data->host_milkshake_state == GmDinnerData::MK_TRAVELLING_TO_WAIT) {
+                v2i points[] = {{31,33},{31,29},{30,27}};
+                local_persist i32 point=0;
+                v2 host = {(float)data->host_x,(float)data->host_y};
+                if (distance_between(host,v2((float)points[point].x,(float)points[point].y)) < 0.1) {
+                    point++;
+                    if (point >= 3) {
+                        data->host_milkshake_state = GmDinnerData::MK_WAIT;
+                        data->can_interact_with_host=true;
+                    }
+                } else {
+                    v2 vec = vec_to(host,v2((float)points[point].x,(float)points[point].y)) * timestep * 5.0;
+                    data->host_x += (double)vec.x;
+                    data->host_y += (double)vec.y;
+                }
+            } else if (data->host_milkshake_state == GmDinnerData::MK_INITIAL_SPEAK) {
+                if (Mix_Playing(0) == false) {
+                    data->host_milkshake_state = GmDinnerData::MK_GIVE_MILKSHAKE;
+                    data->timer = 0.0;
+                }
+            } else if (data->host_milkshake_state == GmDinnerData::MK_GIVE_MILKSHAKE) {
+                data->timer += timestep;
+                if (data->timer > milkshake_give_length_total) {
+                    data->timer = 0;
+                    data->host_milkshake_state = GmDinnerData::MK_MILKSHAKE_DRANK_REACTION;
+                    Mix_PlayChannel(1,game_state->dinner_drink,0);
+                    data->instr=0;
+                }
+            } else if (data->host_milkshake_state == GmDinnerData::MK_MILKSHAKE_DRANK_REACTION) {
+                if (data->instr==0) {
+                    if (Mix_Playing(1) == false) {
+                        data->instr++;
+                        Mix_PlayChannel(0,game_state->dinner_drink_milkshake_reaction,0);
+                    }
+                } else if (data->instr == 1) {
+                    if (Mix_Playing(0) == false) {
+                        data->gameplay_state = GmDinnerData::CHOICE;
+                        data->choices[0] = generate_text_obj(game_state->font,"yes",COLOR_WHITE,0);
+                        data->choices[1] = generate_text_obj(game_state->font,"no",COLOR_WHITE,0);
+                        data->choices[0].position = {NATIVE_GAME_WIDTH/2 - NATIVE_GAME_WIDTH/5 - data->choices[0].get_draw_rect().w/2,NATIVE_GAME_HEIGHT/2 + NATIVE_GAME_HEIGHT/5};
+                        data->choices[1].position = {NATIVE_GAME_WIDTH/2 + NATIVE_GAME_WIDTH/5 - data->choices[1].get_draw_rect().w/2,NATIVE_GAME_HEIGHT/2 + NATIVE_GAME_HEIGHT/5};
+                        data->choice_count=2;
+
+                        data->instr++;
+                    }
+                } else if (data->instr == 2) {
+                    if (data->gameplay_state == GmDinnerData::CHOICE) {
+                        if (DinnerChoice(data->choices[0].get_draw_rect())) {
+                            data->gameplay_state = GmDinnerData::GAMEPLAY;
+                            Mix_PlayChannel(0,game_state->dinner_milkshake_give_reasons,0);
+                            data->can_move = false;
+                            data->instr++;
+                        } else if (DinnerChoice(data->choices[1].get_draw_rect())) {
+                            data->gameplay_state = GmDinnerData::GAMEPLAY;
+                            Mix_PlayChannel(0,game_state->dinner_milkshake_please_leave,0);
+                            Mix_HaltMusic();
+                            data->instr++;
+                        }
+                    }
+                } else if (data->instr == 3) {
+                    if (Mix_Playing(0) == false) {
+                        data->gameplay_state = GmDinnerData::MILKSHAKE_SELECT;
+                        for (i32 ind=0; ind<16; ind++) {
+                            auto &text = data->milkshake_text[ind];
+                            text = generate_text_obj(game_state->font,milkshake_options[ind],COLOR_WHITE,0);
+                            text.position = {12, 20 + ind*24};
+                        }
+                        
+                        data->instr++;
+                    }
+                } else if (data->instr == 4) {
+                    if (data->gameplay_state == GmDinnerData::MILKSHAKE_SELECT) {
+                        if (data->dragging_milkshake_scrollbar == false) {
+                            v2i mpos = GetMousePositionIngame();
+                            if (input->mouse_just_pressed) {
+                                i32 scroll_render_value = data->how_scrolled_on_milkshake_select/3;
+                                scroll_render_value = MIN(scrollbar_full.h-16,scroll_render_value);
+                                scroll_render_value = MAX(scroll_render_value,0);
+
+                                
+                                iRect scrollbar_rect = {scrollbar_full.x,scrollbar_full.y+scroll_render_value,scrollbar_full.w,16};
+                                if (rect_contains_point(scrollbar_rect,mpos)) {
+                                    data->dragging_milkshake_scrollbar=true;
+                                }
+
+                                i32 text_render_range = data->milkshake_text[15].get_draw_rect().y+24 - data->milkshake_text[0].get_draw_rect().y - NATIVE_GAME_HEIGHT + 52;
+                                i32 text_scroll_ratio = (i32)((double)text_render_range * ((double)scroll_render_value/(double)(scrollbar_full.h-16)));
+
+                                iRect submit_rect = {NATIVE_GAME_WIDTH/2 - 32, NATIVE_GAME_HEIGHT - 32, 64, 16};
+                                submit_rect.y += text_render_range;
+                                submit_rect.y -= text_scroll_ratio;
+                                iRect submit_src = {16,96,48,16};
+
+                                if (DinnerChoice(submit_rect)) {
+                                    bool all_selected=true;
+                                    for (i32 selection_ind=0; selection_ind<3; selection_ind++) {
+                                        if (data->milkshake_selections[selection_ind] == -1) {
+                                            all_selected = false;
+                                            break;
+                                        }
+                                    }
+                                    
+                                    if (all_selected) {
+                                        data->gameplay_state = GmDinnerData::GAMEPLAY;
+                                        data->instr++;
+                                        Mix_PlayChannel(0,GetChunk("res/sound/dinner_milkshake_reason_reaction.ogg"),0);
+                                    } else {
+                                        Mix_PlayChannel(3,GetChunk("res/sound/dinner_wrong_buzzer.ogg"),0);
+                                        Mix_VolumeChunk(GetChunk("res/sound/dinner_wrong_buzzer.ogg"),15);
+                                    }
+                                }
+                            }
+                        } else {
+                            if (input->mouse_just_released) {
+                                data->dragging_milkshake_scrollbar=false;
+                                data->how_scrolled_on_milkshake_select=MIN((scrollbar_full.h-16)*3,data->how_scrolled_on_milkshake_select);
+                                data->how_scrolled_on_milkshake_select=MAX(0,data->how_scrolled_on_milkshake_select);
+                            } else {
+                                data->how_scrolled_on_milkshake_select += input->mouseYMotion;
+                            }
+                        }
+                    }
+                } else if (data->instr == 5) {
+                    if (Mix_Playing(0) == false) {
+                        data->instr++;
+                        data->choices[0] = generate_text_obj(game_state->font,"Book",COLOR_WHITE,0);
+                        data->choices[1] = generate_text_obj(game_state->font,"Can't wait",COLOR_WHITE,0);
+                        data->choices[0].position = {NATIVE_GAME_WIDTH/2 - NATIVE_GAME_WIDTH/5 - data->choices[0].get_draw_rect().w/2,NATIVE_GAME_HEIGHT/2 + NATIVE_GAME_HEIGHT/5};
+                        data->choices[1].position = {NATIVE_GAME_WIDTH/2 + NATIVE_GAME_WIDTH/5 - data->choices[1].get_draw_rect().w/2,NATIVE_GAME_HEIGHT/2 + NATIVE_GAME_HEIGHT/5};
+                        data->choice_count = 2;
+                        data->gameplay_state = GmDinnerData::CHOICE;
+                    }
+                } else if (data->instr == 6) {
+                    if (DinnerChoice(data->choices[0].get_draw_rect())) {
+                        data->instr++;
+                        Mix_PlayChannel(0,GetChunk("res/sound/dinner_after_milkshake_book_reaction.ogg"),0);
+                        data->gameplay_state = GmDinnerData::GAMEPLAY;
+                    } else if (DinnerChoice(data->choices[1].get_draw_rect())) {
+                        // we getting silly w it with the branching instruction pointer!!!
+                        data->instr += 2;
+                        Mix_PlayChannel(0,GetChunk("res/sound/dinner_yahtzee_wait_for_it.ogg"),0);
+                        data->gameplay_state = GmDinnerData::GAMEPLAY;
+                    }
+                } else if (data->instr == 7) {
+                    if (Mix_Playing(0) == false) {
+                        data->instr++;
+                        Mix_PlayChannel(0,GetChunk("res/sound/dinner_yahtzee_wait_for_it.ogg"),0);
+                    }
+                } else if (data->instr == 8) {
+                    if (Mix_Playing(0) == false) {
+                        data->instr++;
+                    }
+                } else if (data->instr == 9) {
+                    v2i points[] = {{30,27},{31,29},{31,33},{22,33},{22,28},{26,28}};
+                    local_persist i32 point=0;
+                    local_persist bool backwards=false;
+                    v2 host = {(float)data->host_x,(float)data->host_y};
+                    if (distance_between(host,v2((float)points[point].x,(float)points[point].y)) < 0.1) {
+                        if (backwards == false) {
+                            if (point >= 5) {
+                                backwards = true;
+                                data->host_object = GmDinnerData::GO_YAHTZEE;
+                            } else {
+                                point++;
+                            }
+                        } else {
+                            point--;
+                            if (point < 0) {
+                                data->instr++;
+                            }
+                        }
+                    } else {
+                        v2 vec = vec_to(host,v2((float)points[point].x,(float)points[point].y)) * timestep * 5.0;
+                        data->host_x += (double)vec.x;
+                        data->host_y += (double)vec.y;
+                    }
+                } else if (data->instr == 10) {
+                    data->instr++;
+                    Mix_PlayChannel(0,GetChunk("res/sound/dinner_yahtzee.ogg"),0);
                 }
             }
         }
@@ -333,10 +584,9 @@ void UpdateGmDinner(float timestep) {
     } else {
         Mix_VolumeChunk(game_state->dinner_dog_whimpering,0);
     }
-    //printf("%f\n",dist);
     
     // update world
-    if (door_state != GmDinnerData::DOOR_CLOSED) {
+    if (data->host_task == GmDinnerData::GETTING_DOOR) {
         door_opened_timer += timestep;
         if (door_state == GmDinnerData::DOOR_KNOCKED) {
             if (door_opened_timer >= 2.f) {
@@ -369,26 +619,31 @@ void UpdateGmDinner(float timestep) {
             if (Mix_Playing(0) == false) {
                 door_state = GmDinnerData::DOOR_CLOSED;
                 data->gameplay_state = GmDinnerData::CHOICE;
-                data->text_yes = generate_text_obj(game_state->font,"yes",COLOR_WHITE,0);
-                data->text_no = generate_text_obj(game_state->font,"no",COLOR_WHITE,0);
-                data->text_yes.position = {NATIVE_GAME_WIDTH/2 - NATIVE_GAME_WIDTH/5 - data->text_yes.get_draw_rect().w/2,NATIVE_GAME_HEIGHT/2 + NATIVE_GAME_HEIGHT/5};
-                data->text_no.position = {NATIVE_GAME_WIDTH/2 + NATIVE_GAME_WIDTH/5 - data->text_yes.get_draw_rect().w/2,NATIVE_GAME_HEIGHT/2 + NATIVE_GAME_HEIGHT/5};
+                data->choices[0] = generate_text_obj(game_state->font,"yes",COLOR_WHITE,0);
+                data->choices[1] = generate_text_obj(game_state->font,"no",COLOR_WHITE,0);
+                data->choices[0].position = {NATIVE_GAME_WIDTH/2 - NATIVE_GAME_WIDTH/5 - data->choices[0].get_draw_rect().w/2,NATIVE_GAME_HEIGHT/2 + NATIVE_GAME_HEIGHT/5};
+                data->choices[1].position = {NATIVE_GAME_WIDTH/2 + NATIVE_GAME_WIDTH/5 - data->choices[1].get_draw_rect().w/2,NATIVE_GAME_HEIGHT/2 + NATIVE_GAME_HEIGHT/5};
+                data->choice_count=2;
+
             }
         }
-    } if (data->gameplay_state == GmDinnerData::CHOICE) {
-        if (input->mouse_just_pressed) {
-            v2i mpos = GetMousePositionIngame();
-            if (rect_contains_point(data->text_yes.get_draw_rect(),mpos)) {
+        
+        if (data->gameplay_state == GmDinnerData::CHOICE) {
+            if (DinnerChoice(data->choices[0].get_draw_rect())) {
                 data->gameplay_state = GmDinnerData::GAMEPLAY;
                 Mix_PlayChannel(0,game_state->dinner_yes_to_drink,0);
                 data->host_state = GmDinnerData::SPEAKING;
-            } else if (rect_contains_point(data->text_no.get_draw_rect(),mpos)) {
+                data->host_task = GmDinnerData::NONE;
+            } else if (DinnerChoice(data->choices[1].get_draw_rect())) {
                 data->gameplay_state = GmDinnerData::GAMEPLAY;
                 Mix_PlayChannel(0,game_state->dinner_no_to_drink,0);
                 data->host_state = GmDinnerData::SPEAKING;
+                data->host_task = GmDinnerData::NONE;
             }
-        }
-    } if (data->host_state == GmDinnerData::SPEAKING) {
+        } 
+    }
+
+    if (data->host_state == GmDinnerData::SPEAKING) {
         if (Mix_Playing(0) == false) {
             data->host_state = GmDinnerData::TRAVELLING;
         }
@@ -407,11 +662,24 @@ void UpdateGmDinner(float timestep) {
             data->host_y += (double)vec.y;
         }
     }
+
+    // align host object to host
+    if (data->host_object != GmDinnerData::GO_NONE) {
+        auto &host_object = data->world_objects[data->host_object];
+        host_object.pos = {(float)data->host_x,(float)data->host_y};
+        host_object.pos += {(float)-dir_x/10.0f,(float)-dir_y/10.0f};
+    }
 }
 
 
 void DrawGmDinner() {
     GmDinnerData *data = &game_state->gm_dinner_data;
+    
+    glBindFramebuffer(GL_FRAMEBUFFER,game_state->game_framebuffer);
+    glViewport(0,0,NATIVE_GAME_WIDTH,NATIVE_GAME_HEIGHT);
+    glClearColor(0.0,0.0,0.0,1.0);
+    glClear(GL_COLOR_BUFFER_BIT);
+
     double dir_x = data->dir_x;
     double dir_y = data->dir_y;
     double player_x = data->player_x;
@@ -419,10 +687,12 @@ void DrawGmDinner() {
     double plane_x = data->plane_x;
     double plane_y = data->plane_y;
     auto &world_objects = data->world_objects;
+
+    glBindFramebuffer(GL_FRAMEBUFFER,game_state->game_framebuffer);
     
     UseShader(&game_state->colorShader);
     game_state->colorShader.UniformColor("color",COLOR_BLACK);
-    game_state->colorShader.UniformM4fv("projection",game_state->projection);
+    game_state->colorShader.UniformM4fv("projection",game_state->projection);//glm::ortho(0.0f, static_cast<float>(NATIVE_GAME_WIDTH), static_cast<float>(NATIVE_GAME_HEIGHT), 0.0f, -1.0f, 1.0f));//game_state->projection);
     game_state->colorShader.UniformM4fv("model",glm::mat4(1.0f));
     GL_DrawRect({0,0,NATIVE_GAME_WIDTH,NATIVE_GAME_HEIGHT});
 
@@ -454,7 +724,6 @@ void DrawGmDinner() {
         object_order[pos] = temp;
     }
 
-    
     // go through every verticle stripe and cast a ray in that direction, outwards from the player
     for (int x=0; x<NATIVE_GAME_WIDTH; x++) {
         double normalized_coord = (2 * x) / ((double)(NATIVE_GAME_WIDTH)) - 1.0;
@@ -538,9 +807,12 @@ void DrawGmDinner() {
 
                 col_x -= floor(col_x);
 
-                GLuint texture = game_state->dinner_tiles_texture;
-
-                double wall_height=1.0;
+                // flip the texture if its the right or back side of it
+                if (player_y > map_y+1 && side == 1 || player_x < map_x && side == 0) {
+                    col_x = -(col_x - 0.5) + 0.5;
+                }
+                
+                double wall_height=0.0;
                 iRect src_rect = {0,0,32,32};
                 if (collision == 1) {
                     src_rect = {96,0,32,32};
@@ -552,13 +824,29 @@ void DrawGmDinner() {
                     src_rect = {160,0,32,32};
                 } else if (collision == 7) {
                     src_rect = {192,20,32,12};
-                    wall_height = 12.0 / 32.0;
+                    //wall_height = 12.0 / 32.0;
+                } else if (collision == 8) {
+                    src_rect = {224,0,32,32};
+                    // scaffolding
+                } else if (collision == 9) {
+                    src_rect = {192,34,32,30};
+                } else if (collision == 10) {
+                    src_rect = {128,52,32,12};
+                    //wall_height = 30.0 / 32.0;
+                } else if (collision == 11) {
+                    src_rect = {0,54,32,10};
+                } else if (collision == 12) {
+                    src_rect = {32,32,32,32};
+                }
+
+                if (wall_height == 0.0) {
+                    wall_height = src_rect.h / 32.0;
                 }
 
                 texture_x_coord = int(col_x * (double)src_rect.w);
 
                 double full_wall_height = (NATIVE_GAME_HEIGHT/perp_distance);
-                double projected_wall_height = (full_wall_height * wall_height);
+                i32 projected_wall_height = (i32)(full_wall_height * wall_height);
 
                 i32 wall_bottom, wall_top;
 
@@ -573,43 +861,36 @@ void DrawGmDinner() {
                     }
                 }
 
+                if (prev_wall_top != 0 && wall_top > prev_wall_top) {
+                    goto ray_draw_finish;
+                }
+
                 // render top of wall
                 if (just_collided) {
+                    // only draw ceiling if the second point is above the first point
                     iRect rect = {x,(i32)(wall_top),1,(i32)(prev_wall_top-wall_top)};
-
-                    UseShader(&game_state->colorShader);
+                    if (rect.y < prev_wall_top) {
+                        UseShader(&game_state->colorShader);
                     
-                    double min_dist = 6.0;
-                    double max_dist = data->max_view_distance;
-                    double dist_val = (max_dist - MAX(0,perp_distance - min_dist)) / max_dist;
-                    dist_val = MAX(0,dist_val);
-                    u8 dist_col = (u8)(dist_val * 255);
-                    dist_col = MAX(dist_col,35);
+                        double min_dist = 6.0;
+                        double max_dist = data->max_view_distance;
+                        double dist_val = (max_dist - MAX(0,perp_distance - min_dist)) / max_dist;
+                        dist_val = MAX(0,dist_val);
+                        u8 dist_col = (u8)(dist_val * 255);
+                        dist_col = MAX(dist_col,35);
 
-                    Color col = Color(0,0,(u8)((dist_col/255.0) * 255),255);
+                        Color col = Color::hexToColor(0x411606ff);
 
-                    game_state->colorShader.UniformColor("color",col);
+                        game_state->colorShader.UniformColor("color",col);
                     
-                    GL_DrawRect(rect);
-                    UseShader(&game_state->textureShader);
+                        GL_DrawRect(rect);
+                        UseShader(&game_state->textureShader);
+                    }
                     
                 } else {
                     i32 absolute_wall_height = wall_bottom-wall_top;
-                    double percentage_visible = (double)absolute_wall_height / (double)projected_wall_height;
-                    if (percentage_visible > 1) {
-                        percentage_visible = MIN(percentage_visible,1);
-                    }
-                    if (!continuation) {
-                        percentage_visible = 1.0;
-                    }
-                    i32 src_height = (i32)(src_rect.h * percentage_visible);
-                    iRect rect = {x,wall_top,1,absolute_wall_height};
-                    if (src_height > src_rect.h) {
-                        //printf("%d\n",src_height);
-                    }
-                    src_rect = {src_rect.x+texture_x_coord,src_rect.y,1,src_height};
 
-                    game_state->textureShader.Uniform1i("_texture",texture);
+                    game_state->textureShader.Uniform1i("_texture",GetTexture("res/imgs/dinner_tiles.png"));
 
                     double min_dist = 6.0;
                     double max_dist = data->max_view_distance;
@@ -618,14 +899,41 @@ void DrawGmDinner() {
                     u8 dist_col = (u8)(dist_val * 255);
                     dist_col = MAX(dist_col,35);
                     game_state->textureShader.UniformColor("colorMod",Color(dist_col,dist_col,dist_col,255));
-                    GL_DrawTexture(src_rect,rect);                
+
+                    if (absolute_wall_height < projected_wall_height && prev_wall_top >= wall_bottom) {
+                        src_rect = {src_rect.x+texture_x_coord,src_rect.y,1,src_rect.h};
+                        iRect rect = {x,wall_top,1,projected_wall_height};
+
+                        glBindFramebuffer(GL_FRAMEBUFFER,game_state->dinner_line_framebuffer);
+                        glViewport(0,0,1,NATIVE_GAME_HEIGHT*2);
+                        glm::mat4 line_projection = glm::ortho(0.f,1.f,0.f,(float)NATIVE_GAME_HEIGHT*2);
+                        // god only knows WHY the 
+                        game_state->textureShader.UniformM4fv("projection",line_projection);
+                        GL_DrawTexture(src_rect,{0,0,1,projected_wall_height});
+
+                        glBindFramebuffer(GL_FRAMEBUFFER,game_state->game_framebuffer);
+                        glViewport(0,0,NATIVE_GAME_WIDTH,NATIVE_GAME_HEIGHT);
+                        
+                        game_state->textureShader.UniformM4fv("projection",game_state->projection);
+                        game_state->textureShader.Uniform1i("_texture",game_state->dinner_line_framebuffer_texture);
+                        GL_DrawTexture({0,0,1,absolute_wall_height},{x,wall_top,1,absolute_wall_height},false,false);
+                    } else {
+                        src_rect = {src_rect.x+texture_x_coord,src_rect.y,1,src_rect.h};
+                        iRect rect = {x,wall_top,1,absolute_wall_height};
+                        GL_DrawTexture(src_rect,rect);
+                    }
                 }
 
+        ray_draw_finish:
                 prev_wall_height = wall_height;
-                prev_wall_top = wall_top;
+                if (collision_count) {
+                    prev_wall_top = MIN(prev_wall_top,wall_top);
+                } else {
+                    prev_wall_top = wall_top;
+                }
                 collision_count++;
 
-                if (wall_height == 1.0) {
+                if (wall_height == 1.0 || prev_wall_top <= 0) {
                     break;
                 }
                 if (just_collided) {
@@ -643,60 +951,6 @@ void DrawGmDinner() {
             }
         }
 
-        /*
-        if (collision) {
-            double col_x;
-            int texture_x_coord;
-            if (side == 0) {
-                perp_distance = side_dist_x - delta_dist_x;
-                col_x = player_y + perp_distance * target_y;
-            } else {
-                perp_distance = side_dist_y - delta_dist_y;
-                col_x = player_x + perp_distance * target_x;
-            }
-            col_x -= floor(col_x);
-
-
-            GLuint texture = game_state->dinner_tiles_texture;
-
-            double wall_height=1.0;
-            iRect src_rect = {0,0,32,32};
-            if (collision == 1) {
-                src_rect = {96,0,32,32};
-            } else if (collision == 2) {
-                src_rect = {0,0,32,32};
-            } else if (collision == 3) {
-                src_rect = {64,0,32,32};
-            } else if (collision == 6) {
-                src_rect = {160,0,32,32};
-                wall_height = 0.2;
-                printf("WTF\n");
-            }
-            texture_x_coord = int(col_x * (double)src_rect.w);
-            //src_rect.y = (i32)((1.0 - last_rendered_height) * src_rect.h);
-            src_rect.h = (i32)((1.0 - last_rendered_height) * src_rect.h);
-
-            int full_wall_height = (int)(NATIVE_GAME_HEIGHT/perp_distance);
-            int projected_wall_height = (int)((NATIVE_GAME_HEIGHT/perp_distance) * wall_height);
-            i32 wall_bottom = (NATIVE_GAME_HEIGHT/2+full_wall_height/2);
-            i32 wall_top = wall_bottom - projected_wall_height;
-            iRect rect = {x,wall_top,1,wall_bottom-wall_top};
-            src_rect = {src_rect.x + (int)(texture_x_coord),0,1,src_rect.h};
-            game_state->textureShader.Uniform1i("_texture",texture);
-
-            double min_dist = 6.0;
-            double max_dist = data->max_view_distance;
-            double dist_val = (max_dist - MAX(0,perp_distance - min_dist)) / max_dist;
-            dist_val = MAX(0,dist_val);
-            u8 dist_col = (u8)(dist_val * 255);
-            dist_col = MAX(dist_col,35);
-            game_state->textureShader.UniformColor("colorMod",Color(dist_col,dist_col,dist_col,255));
-            GL_DrawTexture(src_rect,rect);
-            
-            last_rendered_height = wall_height;
-        }
-        */
-
         game_state->textureShader.UniformColor("colorMod",COLOR_WHITE);
 
         for (i32 ind=0;ind<GmDinnerData::GO_COUNT;ind++) {
@@ -705,11 +959,48 @@ void DrawGmDinner() {
             // see if the ray collides with the world object, and if there is a wall collision, check if
             // the collision to the object is closer than the collision to the wall
             bool collides = false;
-            float width = 2.0f;
+            double tex_size=0.0;
+
+            v2 object_size = {1.f,1.f};
+            v2i tex_begin={0,0};
+            
+            if (obj == GmDinnerData::GO_TV) {
+                tex_size = 128;
+                tex_begin.x = data->world_objects[GmDinnerData::GO_TV].on * (i32)tex_size;
+                game_state->textureShader.Uniform1i("_texture",game_state->dinner_sprites_texture);
+                object_size *= 1.5f;
+            } else if (obj == GmDinnerData::GO_CHINA) {
+                tex_size = 128;
+                tex_begin = {0,128};
+                game_state->textureShader.Uniform1i("_texture",game_state->dinner_sprites_texture);
+                object_size *= 0.5f;
+            } else if (obj == GmDinnerData::GO_HOST) {
+                tex_size = 640;
+                game_state->textureShader.Uniform1i("_texture",game_state->dinner_host_texture);
+                object_size.x = 2.0f;
+                //width = object_size*2.0;
+            } else if (obj == GmDinnerData::GO_WRENCH) {
+                tex_size = 128;
+                tex_begin = {0,384};
+                game_state->textureShader.Uniform1i("_texture",game_state->dinner_sprites_texture);
+                object_size *= 0.25f;
+            } else if (obj == GmDinnerData::GO_YAHTZEE) {
+                tex_size = 128;
+                tex_begin = {0,512};
+                game_state->textureShader.Uniform1i("_texture",game_state->dinner_sprites_texture);
+                object_size *= 0.25f;
+            } else if (obj == GmDinnerData::GO_AQUARIUM) {
+                tex_size = 128;
+                tex_begin = {0,640};
+                game_state->textureShader.Uniform1i("_texture",game_state->dinner_sprites_texture);
+                object_size *= 0.5f;
+            }
+
+            
             v2 line_end = player + v2({(float)target_x,(float)target_y});
             v2 col = closest_point_on_line(player,line_end,object);
             float dist_from_ray_to_obj = distance_between(col,object);
-            if (dist_from_ray_to_obj < width/2.f) {
+            if (dist_from_ray_to_obj < object_size.x/2.0f) {
                 // scuffed way of making sure the ray doesn't intersect out the wrong side
                 bool correct_direction = distance_between(col,line_end) < distance_between(col,player);
                 if (correct_direction) {
@@ -731,66 +1022,240 @@ void DrawGmDinner() {
                     angle_to_target += PIf*2;
                 }
                 if (angle_to_obj > angle_to_target) {
-                    col_x = 0.5 - (dist_from_ray_to_obj/width);
+                    col_x = 0.5 - (dist_from_ray_to_obj/(object_size.x));
                 } else {
-                    col_x = 0.5 + (dist_from_ray_to_obj/width);
+                    col_x = 0.5 + (dist_from_ray_to_obj/(object_size.x));
                 }
 
-                double tex_size=0.0;
-                v2i tex_begin={0,0};
-                if (obj == GmDinnerData::GO_TV) {
-                    tex_size = 128;
-                    tex_begin.x = data->world_objects[GmDinnerData::GO_TV].on * (i32)tex_size;
-                    game_state->textureShader.Uniform1i("_texture",game_state->dinner_sprites_texture);
-                } else if (obj == GmDinnerData::GO_CHINA) {
-                    tex_size = 128;
-                    tex_begin = {0,128};
-                    game_state->textureShader.Uniform1i("_texture",game_state->dinner_sprites_texture);
-                } else if (obj == GmDinnerData::GO_HOST) {
-                    tex_size = 640;
-                    game_state->textureShader.Uniform1i("_texture",game_state->dinner_host_texture);
-                } else if (obj == GmDinnerData::GO_WRENCH) {
-                    tex_size = 128;
-                    tex_begin = {0,384};
-                    game_state->textureShader.Uniform1i("_texture",game_state->dinner_host_texture);
-                }
                 int texture_x_coord = int(tex_begin.x + col_x * tex_size);
 
                 double dist_to_obj = (double)distance_between(player,object);
 
                 // replace this with the height of the distance from the player to the center of the object
                 // that way the height is constant for all angles
-                int wall_height = (int)(NATIVE_GAME_WIDTH/dist_to_obj);
-                double tile_height = 12.0 / 32.0;
 
-                double full_tile_height = (NATIVE_GAME_HEIGHT/dist_to_obj);
-                double projected_tile_height = (full_tile_height * tile_height);
+                double full_tile_height = (i32)(NATIVE_GAME_HEIGHT/dist_to_obj);
+
+                // all this should only be calculated once, its all the same
+                // outputs regardless of which ray is cast
+                
+                // get the tile its resting on
+                v2i map_pos = {(i32)(object.x),(i32)(object.y)};
+                
+                i32 tile_height = 0;
+
+                if (obj == data->host_object) {
+                    tile_height = (i32)(0.3 * full_tile_height);
+                    
+                } else {
+                    i32 tile = data->dinner_world_map[map_pos.x][map_pos.y];
+                    if (tile != 0 && tile != 3) {
+                        double height_in_tiles=1.0;
+                        if (tile == 7) {
+                            height_in_tiles = 12.0/32.0;
+                        } else if (tile == 10) {
+                            height_in_tiles = 12.0/32.0;                            
+                        } else if (tile == 11) {
+                            height_in_tiles = 10.0/32.0;                            
+                        }
+                        tile_height = (i32)(full_tile_height * height_in_tiles);
+                    }
+                }
                 i32 tile_bottom = (i32)(NATIVE_GAME_HEIGHT/2.0+full_tile_height/2.0);
-                i32 tile_top = (i32)(tile_bottom - projected_tile_height);
+                i32 tile_top = (i32)(tile_bottom - tile_height);
 
-                iRect rect = {x,tile_top-wall_height,1,wall_height};
+                int object_height = (int)(full_tile_height * object_size.y);
+                iRect rect = {x,tile_top-object_height,1,object_height};
                 iRect src_rect = {(int)(texture_x_coord),tex_begin.y,1,(i32)tex_size};
                 GL_DrawTexture(src_rect,rect);
+
+                /*
+                i32 object_height = (i32)(wall_height * object_size);
+                object_height = MIN(object_height,wall_height);
+                iRect rect = {x,tile_bottom-object_height,1,object_height};
+                iRect src_rect = {(int)(texture_x_coord),tex_begin.y,1,(i32)tex_size};
+                GL_DrawTexture(src_rect,rect);
+                */
             }
+        }
+    }
+
+    if (data->host_task == GmDinnerData::WAITING_FOR_MILKSHAKE) {
+        if (data->host_milkshake_state == GmDinnerData::MK_GIVE_MILKSHAKE) {
+            game_state->textureShader.Uniform1i("_texture",game_state->dinner_sprites_texture);
+            iRect final_milkshake_position;
+            final_milkshake_position.w = 128;
+            final_milkshake_position.h = 128;
+            final_milkshake_position.x = NATIVE_GAME_WIDTH/2 - final_milkshake_position.w/2;
+            final_milkshake_position.y = NATIVE_GAME_HEIGHT/2 - final_milkshake_position.h/2;
+
+            iRect src_rect = {0,256,128,128};
+            iRect rect;
+            double milkshake_spin_start_time = milkshake_give_length + milkshake_freeze_length;
+
+            if (data->timer < milkshake_give_length + milkshake_freeze_length) {
+                float lerp_val = MIN(1.0f,(float)(data->timer / milkshake_give_length));
+                i32 scale = (i32)lerp(0.f,(float)final_milkshake_position.w,lerp_val);
+                i32 curr_x = NATIVE_GAME_WIDTH/2-scale/2;
+                i32 curr_y = NATIVE_GAME_HEIGHT/2-scale/2 - 10;
+                rect = {curr_x,curr_y,scale,scale};
+            } else if (data->timer < milkshake_spin_start_time+milkshake_spin_length) {
+                rect = {final_milkshake_position.x,final_milkshake_position.y,final_milkshake_position.w,final_milkshake_position.h};
+                
+                // spin uncontrollably!!!
+                double timer = data->timer - milkshake_spin_start_time;
+                double rot_speed = PI*4;
+                game_state->textureShader.UniformM4fv("model",rotate_model_matrix((float)(rot_speed*timer),rect));
+            } else if (data->timer < milkshake_give_length_total) {
+                double timer = data->timer - (milkshake_spin_start_time+milkshake_spin_length);
+                float lerp_val = MIN(1.0f,(float)(timer / milkshake_spin_to_player_length));
+                i32 scale = (i32)lerp((float)final_milkshake_position.w,(float)final_milkshake_position.w*2,lerp_val);
+                i32 curr_x = NATIVE_GAME_WIDTH/2-scale/2;
+                i32 curr_y = (i32)lerp(final_milkshake_position.y,NATIVE_GAME_HEIGHT+16,lerp_val);
+                rect = {curr_x,curr_y,scale,scale};
+            }
+            
+            GL_DrawTexture(src_rect,rect);
+            game_state->textureShader.UniformM4fv("model",glm::mat4(1.0));
+            
+            //GL_DrawTexture
         }
     }
 
     // choice text
     if (data->gameplay_state == GmDinnerData::CHOICE) {
-        game_state->textureShader.Uniform1i("_texture",data->text_yes.gl_texture);
-        GL_DrawTexture({0,0,0,0},data->text_yes.get_draw_rect());
-        game_state->textureShader.Uniform1i("_texture",data->text_no.gl_texture);
-        GL_DrawTexture({0,0,0,0},data->text_no.get_draw_rect());
-    }
-    
-    if (data->hover_object != GmDinnerData::GO_NONE && data->hover_object != GmDinnerData::GO_HOST) {
-        game_state->textureShader.Uniform1i("_texture",game_state->dinner_mouse_icons_texture);
-        i32 size = 32;
-        iRect src_rect = {0,0,16,16};
-        if (data->hover_object == GmDinnerData::GO_DOOR) {
-            src_rect.x = 16;
+        if (data->choice_count) {
+            for (i32 i=0;i<data->choice_count;i++) {
+                generic_drawable *choice = &data->choices[i];
+                game_state->textureShader.Uniform1i("_texture",choice->gl_texture);
+                GL_DrawTexture({0,0,0,0},choice->get_draw_rect());
+            }
         }
-        GL_DrawTexture(src_rect,{NATIVE_GAME_WIDTH/2-size/2,NATIVE_GAME_HEIGHT/2-size/2,size,size});
+    } else if (data->gameplay_state == GmDinnerData::MILKSHAKE_SELECT) {
+        
+        UseShader(&game_state->colorShader);
+        game_state->colorShader.UniformColor("color",Color(8,3,0,200));
+        GL_DrawRect({0,0,NATIVE_GAME_WIDTH,NATIVE_GAME_HEIGHT});
+        GL_DrawRect(scrollbar_full);
+        UseShader(&game_state->textureShader);
+
+        i32 scroll_render_value = data->how_scrolled_on_milkshake_select / 3;
+        scroll_render_value = MIN(scrollbar_full.h-16,scroll_render_value);
+        scroll_render_value = MAX(scroll_render_value,0);
+
+        v2i mpos = GetMousePositionIngame();
+        // text render range
+        i32 text_render_range = data->milkshake_text[15].get_draw_rect().y+24 - data->milkshake_text[0].get_draw_rect().y - NATIVE_GAME_HEIGHT + 52;
+        i32 text_scroll_ratio = (i32)((double)text_render_range * ((double)scroll_render_value/(double)(scrollbar_full.h-16)));
+
+        auto &milkshake_selections = data->milkshake_selections;
+
+        bool all_selected=true;
+        for (i32 selection_ind=0; selection_ind<3; selection_ind++) {
+            if (milkshake_selections[selection_ind] == -1) {
+                all_selected = false;
+                break;
+            }
+        }
+
+        for (i32 ind=0; ind<16; ind++) {
+            auto text = data->milkshake_text[ind];
+            iRect dest = text.get_draw_rect();
+            dest.y -= text_scroll_ratio;
+
+            iRect mRect = dest;
+            mRect.x -= 4;
+            mRect.y -= 2;
+            mRect.h += 4;
+            mRect.w = (scrollbar_full.x-4 - mRect.x);
+
+            bool selected = false;
+            for (i32 selection_ind=0; selection_ind<3; selection_ind++) {
+                if (milkshake_selections[selection_ind] == ind) {
+                    selected = true;
+                    break;
+                }
+            }
+
+            bool hover = rect_contains_point(mRect,mpos);
+            if (hover) {
+                if (input->mouse_just_pressed) {
+                    bool placed=false;
+                    for (i32 selection_ind=0; selection_ind<3; selection_ind++) {
+                        if (milkshake_selections[selection_ind] == ind) {
+                            milkshake_selections[selection_ind] = -1;
+                            placed = true;
+                            selected = false;
+                            break;
+                        }
+                    } if (!placed) {
+                        for (i32 selection_ind=0; selection_ind<3; selection_ind++) {
+                            if (milkshake_selections[selection_ind] == -1) {
+                                milkshake_selections[selection_ind] = ind;
+                                placed = true;
+                                selected = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!placed) {
+                        milkshake_selections[2] = ind;
+                        selected = true;
+                    }
+                }
+            } if (hover || selected) {
+                UseShader(&game_state->colorShader);
+                Color box_col = Color(0,0,0,220);
+                if (selected) {
+                    // draw outline as well
+                    Color outline_col = Color(255,150,0,255);
+                    if (all_selected) {
+                        outline_col = Color(25,150,40,255);
+                    }
+                    game_state->colorShader.UniformColor("color",outline_col);
+                    GL_DrawRect({mRect.x,mRect.y,mRect.w,1});
+                    GL_DrawRect({mRect.x,mRect.y+mRect.h,mRect.w,1});
+                    GL_DrawRect({mRect.x,mRect.y,1,mRect.h});
+                    GL_DrawRect({mRect.x+mRect.w,mRect.y,1,mRect.h+1});
+                    
+                    box_col = Color(255,255,255,100);
+                }
+                game_state->colorShader.UniformColor("color",box_col);
+                GL_DrawRect(mRect);
+                UseShader(&game_state->textureShader);
+            }
+            
+            game_state->textureShader.Uniform1i("_texture",text.gl_texture);
+            GL_DrawTexture({0,0,0,0},dest);
+        }
+
+        iRect scrollbar_rect = {scrollbar_full.x,scrollbar_full.y+scroll_render_value,scrollbar_full.w,16};
+        game_state->textureShader.Uniform1i("_texture",game_state->dinner_tiles_texture);
+        GL_DrawTexture({0,96,8,16},scrollbar_rect);
+
+        iRect submit_rect = {NATIVE_GAME_WIDTH/2 - 32, NATIVE_GAME_HEIGHT - 32, 64, 16};
+        submit_rect.y += text_render_range;
+        submit_rect.y -= text_scroll_ratio;
+        iRect submit_src = {16,96,48,16};
+
+        if (rect_contains_point(submit_rect,mpos)) {
+            submit_src.x = 64;
+        } if (all_selected) {
+            submit_src.y = 112;
+        }
+        
+        GL_DrawTexture(submit_src,submit_rect);
+
+    } else if (data->gameplay_state == GmDinnerData::GAMEPLAY) {
+        if (data->hover_object != GmDinnerData::GO_NONE && (data->hover_object != GmDinnerData::GO_HOST || data->can_interact_with_host)) {
+            game_state->textureShader.Uniform1i("_texture",game_state->dinner_mouse_icons_texture);
+            i32 size = 32;
+            iRect src_rect = {0,0,16,16};
+            if (data->hover_object == GmDinnerData::GO_DOOR) {
+                src_rect.x = 16;
+            }
+            GL_DrawTexture(src_rect,{NATIVE_GAME_WIDTH/2-size/2,NATIVE_GAME_HEIGHT/2-size/2,size,size});
+        }
     }
 }
 

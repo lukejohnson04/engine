@@ -1,3 +1,4 @@
+
 #include <sys/types.h>
 #include <sys/stat.h>
 // #ifndef WIN32
@@ -8,137 +9,77 @@
 #define stat _stat
 #endif
 
-internal_function
-void StoreImgResource(Resource &res) {
-    global_assets->image_resource_pool[global_assets->image_resource_count] = res;
-    global_assets->image_resource_count++;
-}
+#include "game_assets.h"
 
-internal_function
-void StoreChunkResource(Resource &res) {
-    global_assets->chunk_resource_pool[global_assets->chunk_resource_count] = res;
-    global_assets->chunk_resource_count++;
-}
-
-internal_function
-void StoreMusicResource(Resource &res) {
-    global_assets->music_resource_pool[global_assets->music_resource_count] = res;
-    global_assets->music_resource_count++;
-}
-
-internal_function
-void LoadImgResource(std::string path, Resource *res) {
-    SDL_Texture* newTexture = NULL;
-    SDL_Surface* loadedSurface = IMG_Load(path.c_str());
-    if (loadedSurface == NULL) {
-        printf("Jeez loueise! %s! SDL_image Error: %s\n", path.c_str(), IMG_GetError());
-        return;
+// In release mode fetching a texture will be O(1), this is just
+// ugly and brute force so it will always refresh updated textures!
+internal
+GLuint GetTexture(const std::string path) {
+    for (u32 i=0; i<private_global_assets->texture_count; i++) {
+        if (private_global_assets->textures[i].meta.path == path) {
+            return private_global_assets->textures[i].texture;
+        }
+    }
+    
+    // not found - check for it on file and load it
+    Resource temp;
+    glGenTextures(1,&temp.texture);
+    i32 loaded = GL_load_texture(temp.texture,path.c_str());
+    
+    if (!loaded) {
+        printf("Texture %s does not exist!\n",path.c_str());
+        return 0;
     }
 
-    newTexture = SDL_CreateTextureFromSurface(sdl_renderer, loadedSurface);
-    if (newTexture == NULL) {
-        printf("Unable to create texture from %s! SDL Error: %s\n", path.c_str(), SDL_GetError());
-    }
-    //Get rid of old loaded surface
-    SDL_FreeSurface(loadedSurface);
-
-
-    res->texture = newTexture;
-    SDL_QueryTexture(newTexture, NULL, NULL, &res->meta.width, &res->meta.height);
-
+    Resource *res = &private_global_assets->textures[private_global_assets->texture_count++];
+    *res = temp;
+    
     res->meta.path = path;
     struct stat file_data;
     if (stat(path.c_str(), &file_data)==0) {
         res->meta.last_write = file_data.st_mtime;
     }
+    
+    return res->texture;
 }
 
-internal_function
-Resource *GetImgResource(std::string path) {
-    for (u32 i=0; i<game_state->assets.image_resource_count; i++) {
-        if (game_state->assets.image_resource_pool[i].meta.path == path) {
-            return &game_state->assets.image_resource_pool[i];
+internal
+Mix_Chunk *GetChunk(const std::string path) {
+    for (u32 i=0; i<private_global_assets->chunk_count; i++) {
+        if (private_global_assets->chunks[i].meta.path == path) {
+            return private_global_assets->chunks[i].chunk;
         }
     }
-    // not found
+    
+    // not found - check for it on file and load it
     Resource temp;
-    LoadImgResource(path, &temp);
-    StoreImgResource(temp);
-
-    Resource *res = &game_state->assets.image_resource_pool[game_state->assets.image_resource_count-1];
-    if (res == nullptr || res->meta.width == 0 || res->meta.height == 0) {
-        std::cout << "Failed to retrieve image!!!\n";
-        return nullptr;
+    temp.chunk = Mix_LoadWAV(path.c_str());
+    
+    if (temp.chunk == NULL) {
+        printf("Chunk %s does not exist!\n",path.c_str());
+        return NULL;
     }
-    return res;
-}
 
-internal_function
-void LoadChunkResource(std::string path, Resource &res) {
-    res.chunk = Mix_LoadWAV(path.c_str());
-    res.meta.path = path;
+    Resource *res = &private_global_assets->chunks[private_global_assets->chunk_count++];
+    *res = temp;
+    
+    res->meta.path = path;
     struct stat file_data;
     if (stat(path.c_str(), &file_data)==0) {
-        res.meta.last_write = file_data.st_mtime;
-    }
-}
-
-internal_function
-Resource *GetChunkResource(std::string path) {
-    for (u32 i=0; i<global_assets->chunk_resource_count; i++) {
-        if (global_assets->chunk_resource_pool[i].meta.path == path) {
-            return &global_assets->chunk_resource_pool[i];
-        }
+        res->meta.last_write = file_data.st_mtime;
     }
     
-    Resource res;
-    LoadChunkResource(path, res);
-    StoreChunkResource(res);
-    return &global_assets->chunk_resource_pool[global_assets->chunk_resource_count-1];
-}
-
-internal_function
-void FreeChunkResource(game_assets *assets, Resource *chunk) {
-    Mix_FreeChunk(chunk->chunk);
+    return res->chunk;
 }
 
 
-internal_function
-void LoadMusicResource(std::string path, Resource &res) {
-    res.music = Mix_LoadMUS(path.c_str());
-    res.meta.path = path;
+
+internal
+bool ResourceWasUpdated(Resource *res) {
     struct stat file_data;
-    if (stat(path.c_str(), &file_data)==0) {
-        res.meta.last_write = file_data.st_mtime;
-    }
-}
-
-internal_function
-Resource *GetMusicResource(std::string path) {
-    for (u32 i=0; i<global_assets->chunk_resource_count; i++) {
-        if (global_assets->music_resource_pool[i].meta.path == path) {
-            return &global_assets->music_resource_pool[i];
-        }
-    }
-    
-    Resource res;
-    LoadMusicResource(path, res);
-    StoreMusicResource(res);
-    return &global_assets->music_resource_pool[global_assets->music_resource_count-1];
-}
-
-internal_function
-void FreeMusicResource(game_assets *assets, Resource *music) {
-    Mix_FreeMusic(music->music);
-}
-
-
-internal_function
-bool ResourceWasUpdated(Resource &res) {
-    struct stat file_data;
-    if (stat(res.meta.path.c_str(), &file_data)==0) {
+    if (stat(res->meta.path.c_str(), &file_data)==0) {
         time_t last_write = file_data.st_mtime;
-        if (last_write == res.meta.last_write) {
+        if (last_write == res->meta.last_write) {
             return false;
         }
         return true;
@@ -146,47 +87,38 @@ bool ResourceWasUpdated(Resource &res) {
     return false;
 }
 
-internal_function
+
+internal
 void CheckForResourceUpdates(game_assets *assets) {
-    for (u32 id=0; id<assets->image_resource_count; id++) {
-        Resource &res = assets->image_resource_pool[id];
+    for (u32 id=0; id<assets->texture_count; id++) {
+        Resource *res = &assets->textures[id];
         if (ResourceWasUpdated(res)) {
-            SDL_DestroyTexture(res.texture);
-            LoadImgResource(res.meta.path, &res);
-        }
-    }
-    for (u32 id=0; id<assets->chunk_resource_count; id++) {
-        Resource &res = assets->chunk_resource_pool[id];
-        if (ResourceWasUpdated(res)) {
-            Mix_FreeChunk(res.chunk);
-            LoadChunkResource(res.meta.path, res);
-        }
-    }
-    for (u32 id=0; id<assets->music_resource_count; id++) {
-        Resource &res = assets->music_resource_pool[id];
-        if (ResourceWasUpdated(res)) {
-            Mix_FreeMusic(res.music);
-            LoadMusicResource(res.meta.path, res);
-        }
-    }
-    // for (u32 id=0; id<assets->image_resource_count; id++) {
-    //     Resource &res = assets->image_resource_pool[id];
-    //     if (ResourceWasUpdated(res)) {
-    //         SDL_DestroyTexture(res.texture);
-    //         LoadImgResource(res.meta.path, &res);
-    //     }
-    // }
+            i32 loaded = GL_load_texture(res->texture,res->meta.path.c_str());
+    
+            if (!loaded) {
+                continue;
+            }
 
-}
+            struct stat file_data;
+            if (stat(res->meta.path.c_str(), &file_data)==0) {
+                res->meta.last_write = file_data.st_mtime;
+            }
+        }
+    }
 
-internal_function
-Resource *CreateTemporaryImageResource() {
-    if (global_assets->temporary_image_pool[global_assets->next_free_image].texture) {
-        // free resource before overwriting here
+    for (u32 id=0; id<assets->chunk_count; id++) {
+        Resource *res = &assets->chunks[id];
+        if (ResourceWasUpdated(res)) {
+            res->chunk = Mix_LoadWAV(res->meta.path.c_str());
+            
+            if (res->chunk == NULL) {
+                continue;
+            }
+
+            struct stat file_data;
+            if (stat(res->meta.path.c_str(), &file_data)==0) {
+                res->meta.last_write = file_data.st_mtime;
+            }
+        }
     }
-    Resource *res = &global_assets->temporary_image_pool[global_assets->next_free_image++];
-    if (global_assets->next_free_image >= 256) {
-        global_assets->next_free_image = 0;
-    }
-    return res;
 }

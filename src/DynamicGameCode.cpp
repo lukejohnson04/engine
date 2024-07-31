@@ -3,7 +3,7 @@
 #include "gm_dinner.h"
 
 #define WINDOW_WIDTH 720
-#define WINDOW_HEIGHT 240
+#define WINDOW_HEIGHT 540
 
 #define NATIVE_GAME_WIDTH 240
 #define NATIVE_GAME_HEIGHT 180
@@ -14,8 +14,6 @@ v2i GetMousePositionIngame() {
     mpos.y = (int)(((float)mpos.y) / ((float)WINDOW_WIDTH/(float)NATIVE_GAME_WIDTH));
     return mpos;
 }
-
-
 
 struct FightChara {
     v2 pos={0,0};
@@ -49,7 +47,6 @@ struct Car {
     float speed=0.f;
     double angle_body=0.;
     double turn=0.0;
-    //float angle_wheels=0.f;
 };
 
 struct LineupPerson {
@@ -107,11 +104,19 @@ struct LineupPerson {
 
 
 struct GameState {
+    game_assets assets;
+    
     Shader colorShader;
     Shader textureShader;
     Shader bodyShader;
 
     GLuint main_menu_buttons_texture;
+
+    GLuint game_framebuffer;
+    GLuint game_framebuffer_texture;
+
+    GLuint dinner_line_framebuffer;
+    GLuint dinner_line_framebuffer_texture;
     
     GLuint player_texture;
     GLuint goblins_menu_texture;
@@ -158,7 +163,11 @@ struct GameState {
     Mix_Chunk *dinner_dog_lemme_check;
     Mix_Chunk *dinner_after_checking_dog;
     Mix_Chunk *dinner_gunshot;
-    
+    Mix_Chunk *dinner_give_milkshake;
+    Mix_Chunk *dinner_drink;
+    Mix_Chunk *dinner_drink_milkshake_reaction;
+    Mix_Chunk *dinner_milkshake_please_leave;
+    Mix_Chunk *dinner_milkshake_give_reasons;
 
     Mix_Music *dinner_jazz_music;
 
@@ -512,12 +521,21 @@ void InitializeGameMemory(GameMemory *memory) {
     game_state->colorShader = CreateShader("color.vert","color.frag");
     game_state->textureShader = CreateShader("texture.vert","texture.frag");
     game_state->bodyShader = CreateShader("body.vert","body.frag");
-    game_state->projection = glm::ortho(0.0f, static_cast<float>(NATIVE_GAME_WIDTH), static_cast<float>(NATIVE_GAME_HEIGHT), 0.0f, -1.0f, 1.0f);
+    game_state->projection = glm::ortho(0.0f,(float)NATIVE_GAME_WIDTH,0.f,(float)NATIVE_GAME_HEIGHT);
     game_state->mode = GM_DINNER;
     game_state->travelled_state = GameState::POEM_SCROLL;
 
     game_state->player = {};
     game_state->player_car.pos = {100,800};
+
+    glGenTextures(1,&game_state->game_framebuffer_texture);
+    GL_load_texture_for_framebuffer(game_state->game_framebuffer_texture,NATIVE_GAME_WIDTH,NATIVE_GAME_HEIGHT);
+    game_state->game_framebuffer = GL_create_framebuffer(game_state->game_framebuffer_texture);
+
+    glGenTextures(1,&game_state->dinner_line_framebuffer_texture);
+    // larger than screen height because lines can start offscreen
+    GL_load_texture_for_framebuffer(game_state->dinner_line_framebuffer_texture,1,NATIVE_GAME_HEIGHT*2);
+    game_state->dinner_line_framebuffer = GL_create_framebuffer(game_state->dinner_line_framebuffer_texture);
 
     glGenTextures(1,&game_state->main_menu_buttons_texture);
     GL_load_texture(game_state->main_menu_buttons_texture,"res/imgs/main_menu_buttons.png");
@@ -580,7 +598,7 @@ void InitializeGameMemory(GameMemory *memory) {
         printf("ERROR: failed to load res/fonts/Alkhemikal.ttf!\n");
         printf("Error: %s\n", TTF_GetError()); 
     }
-    //TTF_SetFontOutline(game_state->font,2);
+    
     glGenTextures(1,&game_state->text_texture);
     generate_text(game_state->text_texture,game_state->font,robert_frost_poem,COLOR_WHITE,220);
     int miplevel=0;
@@ -604,6 +622,11 @@ void InitializeGameMemory(GameMemory *memory) {
     game_state->dinner_dog_lemme_check = Mix_LoadWAV("res/sound/dinner_dog_lemme_check.ogg");
     game_state->dinner_after_checking_dog = Mix_LoadWAV("res/sound/dinner_after_checking_dog.ogg");
     game_state->dinner_gunshot = Mix_LoadWAV("res/sound/dinner_gunshot.ogg");
+    game_state->dinner_give_milkshake = Mix_LoadWAV("res/sound/dinner_give_milkshake.ogg");
+    game_state->dinner_drink = Mix_LoadWAV("res/sound/dinner_drink.ogg");
+    game_state->dinner_drink_milkshake_reaction = Mix_LoadWAV("res/sound/dinner_drink_milkshake_reaction.ogg");
+    game_state->dinner_milkshake_please_leave = Mix_LoadWAV("res/sound/dinner_milkshake_please_leave.ogg");
+    game_state->dinner_milkshake_give_reasons = Mix_LoadWAV("res/sound/dinner_milkshake_give_reasons.ogg");
     
     game_state->dinner_jazz_music = Mix_LoadMUS("res/sound/dinner_jazz_music.mp3");
     
@@ -698,6 +721,7 @@ extern "C"
 GAME_UPDATE_AND_RENDER(GameUpdateAndRender) {
     game_state = (GameState*)game_memory->permanentStorage;
     input = n_input;
+    private_global_assets = &game_state->assets;
     if (!input) {
         return;
     }    
@@ -932,7 +956,15 @@ render_begin:
     // <----------------------->
     //       RENDER BEGIN
     // <----------------------->
-    
+
+    // start by checking for resource updates
+    static float res_timer=0.f;
+    res_timer += timestep;
+    if (res_timer >= 0.1f) {
+        res_timer = 0.f;
+        CheckForResourceUpdates(&game_state->assets);
+    }
+
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -1691,8 +1723,19 @@ render_begin:
     }
 
 endof_frame:
-
+        
+    glBindFramebuffer(GL_FRAMEBUFFER,0);
+    glViewport(0,0,WINDOW_WIDTH,WINDOW_HEIGHT);
+    
+    glm::mat4 window_proj = glm::ortho(0.f,(float)WINDOW_WIDTH,(float)WINDOW_HEIGHT,0.f);    
+    UseShader(&game_state->textureShader);
+    game_state->textureShader.UniformColor("colorMod",COLOR_WHITE);
+    game_state->textureShader.UniformM4fv("model",glm::mat4(1.0f));
+    game_state->textureShader.Uniform1i("_texture",game_state->game_framebuffer_texture);
+    game_state->textureShader.UniformM4fv("projection",window_proj);
+    GL_DrawTexture({0,0,NATIVE_GAME_WIDTH,NATIVE_GAME_HEIGHT},{0,0,WINDOW_WIDTH,WINDOW_HEIGHT},false,false);
     SDL_GL_SwapWindow(window);
+
 }
 
 #if defined __cplusplus

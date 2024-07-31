@@ -67,12 +67,16 @@ internal void LoadGameCode(win32_game_code *game_code) {
     char *tempDLL = "TempGameCode.dll";
 
     game_code->LastWriteTime = Win32GetLastWriteTime(sourceDLL);
+
     CopyFile(sourceDLL, tempDLL, FALSE);
     game_code->dll = LoadLibrary(tempDLL);
+
     if (game_code->dll) {
         game_code->UpdateAndRender = (game_update_and_render*)GetProcAddress(game_code->dll, "GameUpdateAndRender");
         game_code->HandleEvent = (game_handle_event*)GetProcAddress(game_code->dll, "GameHandleEvent");
         game_code->is_valid = game_code->UpdateAndRender && game_code->HandleEvent;
+    } else {
+        printf("Couldn't load temporary DLL!\n");
     }
 
     if (game_code->is_valid == false) {
@@ -86,9 +90,11 @@ internal void LoadGameCode(win32_game_code *game_code) {
 internal void UnloadGameCode(win32_game_code *game_code) {
     if (game_code->dll) {
         FreeLibrary(game_code->dll);
-        game_code->dll = 0;
+    } else {
+        printf("Game code isn't valid so it can't be unloaded!\n");
     }
 
+    game_code->dll = nullptr;
     game_code->is_valid = false;
     game_code->UpdateAndRender = GameUpdateAndRenderStub;
     game_code->HandleEvent = GameHandleEventStub;
@@ -222,15 +228,24 @@ void Application::Run(std::string start_room) {
     // poll events
     float load_timer=0;
     while (running) {
+        load_timer += FRAME_TIME_MS;
+        if (load_timer >= 100) {
+            FILETIME new_WriteTime = Win32GetLastWriteTime("DynamicGameCode.dll");
+            if (CompareFileTime(&new_WriteTime, &global_game_code.LastWriteTime) != 0) {
+                UnloadGameCode(&global_game_code);
+                LoadGameCode(&global_game_code);
+                printf("Reloaded game code\n");
+            }
+            load_timer -= 200;
+        }
         // check for dll reload
-        FILETIME new_WriteTime = Win32GetLastWriteTime("DynamicGameCode.dll");
-        if (CompareFileTime(&new_WriteTime, &global_game_code.LastWriteTime) != 0) {
+        // events
+        PollEvents(input, global_game_code.HandleEvent, &running);
+        if (input->just_pressed[SDL_SCANCODE_R]) {
             UnloadGameCode(&global_game_code);
             LoadGameCode(&global_game_code);
             printf("Reloaded game code\n");
         }
-        // events
-        PollEvents(input, global_game_code.HandleEvent, &running);
         global_game_code.UpdateAndRender(window, input, &game_memory, nullptr, FRAME_TIME);
         sleep_till_next_update();
     }

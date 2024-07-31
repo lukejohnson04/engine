@@ -28,3 +28,4 @@
 #include "GameplayExtern.cpp"
 #include "Input.cpp"
 #include "Renderer.cpp"
+#include "game_assets.cpp"

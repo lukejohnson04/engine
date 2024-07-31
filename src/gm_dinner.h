@@ -20,6 +20,32 @@ enum TileType {
     COUNT
 };
 
+const double milkshake_give_length = 2.25;
+const double milkshake_freeze_length = 0.5;
+const double milkshake_spin_length = 1.0;
+const double milkshake_spin_to_player_length = 0.5;
+const double milkshake_give_length_total = milkshake_give_length + milkshake_freeze_length + milkshake_spin_length + milkshake_spin_to_player_length;
+
+char milkshake_options[16][128] = {
+    "The taste was excellent",
+    "It was quite flavorful",
+    "The aroma was enticing",
+    "It was simply delicious",
+    "It was candy for the eyes",
+    "It was simply superb",
+    "The flavors melted in my mouth",
+    "The aftertaste was hypnotizing",
+    "It tasted like glue, which I like",
+    "It was quite special and excellent",
+    "I wish I could drink it again",
+    "It was indeed quite marvelous",
+    "The flavors were to die for",
+    "Consuming it was stupendous",
+    "The texture was other worldly",
+    "Time stood still while I consumed"
+};
+
+
 struct GmDinnerData {
     int dinner_world_map[DINNER_MAP_WIDTH][DINNER_MAP_HEIGHT];
 
@@ -36,6 +62,8 @@ struct GmDinnerData {
     double host_y=6;
 
     i32 hover_object=-1;
+    bool can_interact_with_host=false;
+    i32 host_object = GO_NONE;
 
     double timer=0;
 
@@ -46,12 +74,17 @@ struct GmDinnerData {
         GO_TV,
         GO_HOST,
         GO_CHINA,
-        GO_COUNT,
-        GO_DOOR,
         GO_WRENCH,
+        GO_YAHTZEE,
+        GO_AQUARIUM,
+        GO_COUNT,
+
+        GO_DOOR,
         GO_NONE
     };
     Wobject world_objects[GO_COUNT];
+
+    i32 instr=0;
 
     enum {
         DOORWAY_BLOCK_SLIDE,
@@ -67,8 +100,21 @@ struct GmDinnerData {
 
     enum {
         NONE,
-        BLOCKING_DOORWAY
+        GETTING_DOOR,
+        BLOCKING_DOORWAY,
+        WAITING_FOR_MILKSHAKE
     } host_task = NONE;
+
+    enum {
+        MK_TRAVELLING_TO_WAIT,
+        MK_WAIT,
+        MK_INITIAL_SPEAK,
+        MK_TRAVEL_TO_MILKSHAKE,
+        MK_TRAVEL_BACK_FROM_MILKSHAKE,
+        MK_GIVE_MILKSHAKE,
+        MK_MILKSHAKE_DRANK_REACTION,
+        MK_NONE
+    } host_milkshake_state=MK_TRAVELLING_TO_WAIT;
 
     enum {
         DOOR_CLOSED,
@@ -88,10 +134,17 @@ struct GmDinnerData {
     enum {
         GAMEPLAY,
         CHOICE,
+        MILKSHAKE_SELECT,
     } gameplay_state=GAMEPLAY;
 
-    generic_drawable text_yes;
-    generic_drawable text_no;
+    generic_drawable choices[4];
+    i32 choice_count=0;
+
+    generic_drawable milkshake_text[16];
+
+    i32 how_scrolled_on_milkshake_select=0;
+    bool dragging_milkshake_scrollbar=false;
+    i32 milkshake_selections[3] = {-1};
 };
 
 void InitGmDinner();

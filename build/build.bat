@@ -8,7 +8,7 @@ set build=DEBUG
 
 set DebugCompilerFlags= /Zi /Zo /DDEBUG
 set ReleaseCompilerFlags= /O2 /Oi /DRELEASE
-set CommonCompilerFlags= /MP /GR- /EHsc /WX /W4 /wd4201 /wd4100 /wd4189 /wd4505 /wd4127
+set CommonCompilerFlags= /MP /GR- /EHsc /WX /W4 /wd4201 /wd4100 /wd4189 /wd4505 /wd4127 /wd4702
 set CompilerFlags=
 
 set Includes= /I "./" /I "../" /I "%FRAMEWORKS%/SDL2-2.28.4/include" /I "%FRAMEWORKS%\SDL2_ttf-2.20.2/include" /I "%FRAMEWORKS%\SDL2_mixer-2.8.0\include" /I "%FRAMEWORKS%\SDL2_image-2.6.3\include" /I "%FRAMEWORKS%\glew-2.1.0\include" /I "%FRAMEWORKS%\glm-0.9.9.8\includes" /I "../vendor/imgui" /I "../vendor/imgui/backends"

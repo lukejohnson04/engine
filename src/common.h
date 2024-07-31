@@ -56,6 +56,15 @@ struct Color {
     u32 hex() {
         return (r << 24) | (g << 16) | (b << 8) | a;
     }
+
+    static Color hexToColor(const u32 &right) {
+        Color c;
+        c.r = (u8)(right >> 24);
+        c.g = (u8)((right >> 16) & 255);
+        c.b = (u8)((right >> 8) & 255);
+        c.a = (u8)((right) & 255);
+        return c;
+    }
 };
 
 inline bool operator==(Color left, Color right) {
@@ -69,6 +78,8 @@ inline bool operator!=(Color left, Color right) {
 inline bool operator==(Color left, u32 right) {
     return left.hex() == right;
 }
+
+
 
 
 struct v2 {

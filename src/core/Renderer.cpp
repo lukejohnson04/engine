@@ -189,11 +189,11 @@ glm::mat4 rotate_model_matrix(float angleRadians, iRect rect) {
 }
 
 
-internal void GL_load_texture(GLuint tex, const char* path) {
+internal i32 GL_load_texture(GLuint tex, const char* path) {
     SDL_Surface *tex_surf = IMG_Load(path);
     if (tex_surf == NULL) {
         std::cout << "ERROR: Failed to load texture at path " << path << std::endl;
-        return;
+        return 0;
     }
 
     int Mode = GL_RGB;
@@ -209,6 +209,8 @@ internal void GL_load_texture(GLuint tex, const char* path) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    return 1;
 }
 
 internal void GL_load_texture_from_sdl_surface(GLuint tex,SDL_Surface *tex_surf) {
@@ -370,4 +372,23 @@ Uint32 getpixel(SDL_Surface *surface, int x, int y) {
         default:
             return 0;       /* shouldn't happen, but avoids warnings */
     }
+}
+
+internal
+GLuint GL_create_framebuffer(GLuint texture) {
+    GLuint fb;
+    glGenFramebuffers(1,&fb);
+    glBindFramebuffer(GL_FRAMEBUFFER,fb);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER,0);
+    return fb;
+}
+
+internal
+void GL_load_texture_for_framebuffer(GLuint texture,i32 width,i32 height) {
+    glBindTexture(GL_TEXTURE_2D,texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindTexture(GL_TEXTURE_2D,0);
 }
