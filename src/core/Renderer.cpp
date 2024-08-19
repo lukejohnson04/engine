@@ -305,15 +305,14 @@ struct generic_drawable {
 
 
 internal generic_drawable generate_text_obj(TTF_Font *font,std::string str,Color col={255,255,255,255},GLuint tex=NULL) {
-    generic_drawable res;    
+    generic_drawable res;
     SDL_Surface* temp_surface =
         TTF_RenderText_Solid(font, str.c_str(),*(SDL_Color*)&col);
     temp_surface = SDL_ConvertSurfaceFormat(temp_surface, SDL_PIXELFORMAT_ARGB8888, 0);
 
-    if (tex != NULL) {
-        glDeleteTextures(1,&tex);
+    if (tex == NULL) {
+        glGenTextures(1,&tex);
     }
-    glGenTextures(1,&tex);
 
     res.gl_texture = tex;
     GL_load_texture_from_sdl_surface(res.gl_texture,temp_surface);

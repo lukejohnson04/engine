@@ -58,8 +58,8 @@ struct GmDinnerData {
 
     double max_view_distance = 15.0;
 
-    double host_x=5;
-    double host_y=6;
+    double host_x=0;
+    double host_y=0;
 
     i32 hover_object=-1;
     bool can_interact_with_host=false;
@@ -80,6 +80,8 @@ struct GmDinnerData {
         GO_COUNT,
 
         GO_DOOR,
+        GO_LOCKED_DOOR,
+        GO_KEYPAD_LOCKED_DOOR,
         GO_NONE
     };
     Wobject world_objects[GO_COUNT];
@@ -135,6 +137,7 @@ struct GmDinnerData {
         GAMEPLAY,
         CHOICE,
         MILKSHAKE_SELECT,
+        ENTERING_CODE,
     } gameplay_state=GAMEPLAY;
 
     generic_drawable choices[4];
@@ -145,6 +148,11 @@ struct GmDinnerData {
     i32 how_scrolled_on_milkshake_select=0;
     bool dragging_milkshake_scrollbar=false;
     i32 milkshake_selections[3] = {-1};
+
+    generic_drawable keypad_codes[12];
+    i32 code_values[12] = {0};
+    i32 digit_click_direction=0;
+    i32 digit_clicked=-1;
 };
 
 void InitGmDinner();

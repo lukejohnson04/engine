@@ -37,7 +37,8 @@ void InitGmDinner() {
             } else if (col == Color({255,100,0,255})) {
                 game_state->gm_dinner_data.dinner_world_map[y][x] = 3;
             } else if (col == Color({0,0,255,255})) {
-                game_state->gm_dinner_data.dinner_world_map[y][x] = 4;
+                game_state->gm_dinner_data.dinner_world_map[y][x] = 5;
+                printf("123\n");
             } else if (col == 0x474747ff) {
                 game_state->gm_dinner_data.dinner_world_map[y][x] = 6;
             } else if (col == 0x621a00ff) {
@@ -52,7 +53,8 @@ void InitGmDinner() {
                 game_state->gm_dinner_data.dinner_world_map[y][x] = 11;
             } else if (col == 0xff00ffff) {
                 game_state->gm_dinner_data.dinner_world_map[y][x] = 12;
-                printf("huh\n");
+            } else if (col == 0x783200ff) {
+                game_state->gm_dinner_data.dinner_world_map[y][x] = 13;
             } else {
                 game_state->gm_dinner_data.dinner_world_map[y][x] = 0;
             }
@@ -169,13 +171,13 @@ void UpdateGmDinner(float timestep) {
         };
     } hover_obj;
 
-    const double PLAYER_RADIUS = 0.125;
+    const double PLAYER_RADIUS = 0.05;
     v2 player = {(float)player_x,(float)player_y};
     {
         // loop through and see what was interacted with
         for (i32 x=0; x<DINNER_MAP_WIDTH; x++) {
             for (i32 y=0; y<DINNER_MAP_HEIGHT; y++) {
-                if (dinner_world_map[x][y] != 3) {
+                if (dinner_world_map[x][y] != 3 && dinner_world_map[x][y] != 12 && dinner_world_map[x][y] != 13) {
                     continue;
                 }
 
@@ -189,7 +191,13 @@ void UpdateGmDinner(float timestep) {
                 float dist_to_ray = distance_between(ray_col,center);
                 
                 if (dist_to_ray < 0.5f) {
-                    data->hover_object = GmDinnerData::GO_DOOR;
+                    if (dinner_world_map[x][y] == 3) {
+                        data->hover_object = GmDinnerData::GO_DOOR;
+                    } else if (dinner_world_map[x][y] == 13) {
+                        data->hover_object = GmDinnerData::GO_LOCKED_DOOR;
+                    } else {
+                        data->hover_object = GmDinnerData::GO_KEYPAD_LOCKED_DOOR;                        
+                    }
                     hover_obj.pos = {x,y};
                     break;
                 }
@@ -216,13 +224,26 @@ void UpdateGmDinner(float timestep) {
     // on interact
     if (data->hover_object != GmDinnerData::GO_NONE && input->just_pressed[SDL_SCANCODE_E]) {
         if (data->hover_object == GmDinnerData::GO_DOOR) {
-            if (hover_obj.pos.x!=36 || hover_obj.pos.y!=29) {
-                Mix_PlayChannel(1,game_state->dinner_door_lock,0);
-            } else {
+            if (hover_obj.pos.x==36 && hover_obj.pos.y==29) {
                 Mix_PlayChannel(0,game_state->dinner_knock,0);
                 door_pos=hover_obj.pos;
                 data->host_task = GmDinnerData::GETTING_DOOR;
                 door_state = GmDinnerData::DOOR_KNOCKED;
+            } else {
+                dinner_world_map[hover_obj.pos.x][hover_obj.pos.y] = 0;
+                Mix_PlayChannel(3,GetChunk("res/sound/dinner_door_open.ogg"),0);
+            }
+        } else if (data->hover_object == GmDinnerData::GO_LOCKED_DOOR) {
+            Mix_PlayChannel(1,GetChunk("res/sound/dinner_door_lock.ogg"),0);
+        } else if (data->hover_object == GmDinnerData::GO_KEYPAD_LOCKED_DOOR) {
+            data->gameplay_state = GmDinnerData::ENTERING_CODE;
+            data->can_move = false;
+
+            for (i32 i=0; i<12; i++) {
+                i32 dest = (NATIVE_GAME_WIDTH - 12*16)/2 + i*16;
+                data->keypad_codes[i] = generate_text_obj(game_state->font,std::to_string(data->code_values[i]),COLOR_BLACK,0);
+                data->keypad_codes[i].position.x = dest+8-(data->keypad_codes[i].get_draw_rect().w/2);
+                data->keypad_codes[i].position.y = 48;
             }
         } else if (data->hover_object == GmDinnerData::GO_TV) {
             data->world_objects[GmDinnerData::GO_TV].on ^= 1;
@@ -250,10 +271,15 @@ void UpdateGmDinner(float timestep) {
     if (player_y > DINNER_MAP_HEIGHT-1) player_y = DINNER_MAP_HEIGHT-1;
     if (player_y < 0) player_y = 0;
     if (!data->no_clip) {
-        if (move_y < 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 4 && dinner_world_map[(i32)player_x][(i32)player_y] != 5) {
-            player_y = ceil(player_y);
-        } else if (move_y > 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 4 && dinner_world_map[(i32)player_x][(i32)player_y] != 5) {
-            player_y = floor(player_y) - 0.00001;
+        double player_top = player_y - PLAYER_RADIUS;
+        i32 top_tile = dinner_world_map[(i32)player_x][(i32)player_top];
+        if (top_tile != 0 && top_tile != 5) {
+            player_y = (i32)player_top + 1 + PLAYER_RADIUS;
+        }
+        double player_bottom = player_y + PLAYER_RADIUS;
+        i32 bottom_tile = dinner_world_map[(i32)player_x][(i32)player_bottom];
+        if (bottom_tile != 0 && bottom_tile != 5) {
+            player_y = (i32)player_bottom - PLAYER_RADIUS;
         }
     }
 
@@ -261,10 +287,15 @@ void UpdateGmDinner(float timestep) {
     if (player_x > DINNER_MAP_WIDTH-1) player_x = DINNER_MAP_WIDTH-1;
     if (player_x < 0) player_x = 0;
     if (!data->no_clip) {
-        if (move_x < 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 0 && data->dinner_world_map[(i32)player_x][(i32)player_y] != 4 && data->dinner_world_map[(i32)player_x][(i32)player_y] != 5) {
-            player_x = ceil(player_x);
-        } else if (move_x > 0 && dinner_world_map[(i32)player_x][(i32)player_y] != 0 && data->dinner_world_map[(i32)player_x][(i32)player_y] != 4 && data->dinner_world_map[(i32)player_x][(i32)player_y] != 5) {
-            player_x = floor(player_x) - 0.00001;
+        double player_left = player_x - PLAYER_RADIUS;
+        i32 left_tile = dinner_world_map[(i32)player_left][(i32)player_y];
+        if (left_tile != 0 && left_tile != 5) {
+            player_x = (i32)player_left + 1 + PLAYER_RADIUS;
+        }
+        double player_right = player_x + PLAYER_RADIUS;
+        i32 right_tile = dinner_world_map[(i32)player_right][(i32)player_y];
+        if (right_tile != 0 && right_tile != 5) {
+            player_x = (i32)player_right - PLAYER_RADIUS;
         }
     }
 
@@ -293,7 +324,7 @@ void UpdateGmDinner(float timestep) {
         double block_doorway_endy = 33.5;
         static i32 travel_point=0;
         
-        if (dinner_world_map[(i32)player_x][(i32)player_y] == 4) {
+        if (dinner_world_map[(i32)player_x][(i32)player_y] == 5) {
             // disabled trigger
             dinner_world_map[(i32)player_x][(i32)player_y] = 0;
             data->host_x = block_doorway_startx;
@@ -595,7 +626,7 @@ void UpdateGmDinner(float timestep) {
                 data->host_y = 28;
                 door_state = GmDinnerData::DOOR_OPENING;
                 door_opened_timer=0;
-                Mix_PlayChannel(1,game_state->dinner_door_open,0);
+                Mix_PlayChannel(1,GetChunk("res/sound/dinner_front_door_open.ogg"),0);
             }
             
         } else if (door_state == GmDinnerData::DOOR_OPENING) {
@@ -818,8 +849,9 @@ void DrawGmDinner() {
                     src_rect = {96,0,32,32};
                 } else if (collision == 2) {
                     src_rect = {0,0,32,32};
-                } else if (collision == 3) {
+                } else if (collision == 3 || collision == 13) {
                     src_rect = {64,0,32,32};
+                    
                 } else if (collision == 6) {
                     src_rect = {160,0,32,32};
                 } else if (collision == 7) {
@@ -1046,7 +1078,8 @@ void DrawGmDinner() {
 
                 if (obj == data->host_object) {
                     tile_height = (i32)(0.3 * full_tile_height);
-                    
+                } else if (obj == GmDinnerData::GO_HOST) {
+                    tile_height = 0;
                 } else {
                     i32 tile = data->dinner_world_map[map_pos.x][map_pos.y];
                     if (tile != 0 && tile != 3) {
@@ -1131,6 +1164,79 @@ void DrawGmDinner() {
                 GL_DrawTexture({0,0,0,0},choice->get_draw_rect());
             }
         }
+    } else if (data->gameplay_state == GmDinnerData::ENTERING_CODE) {
+        UseShader(&game_state->colorShader);
+        game_state->colorShader.UniformColor("color",Color(8,3,0,200));
+        GL_DrawRect({0,0,NATIVE_GAME_WIDTH,NATIVE_GAME_HEIGHT});
+
+        UseShader(&game_state->textureShader);
+
+        if (input->mouse_just_released) {
+            data->digit_clicked=-1;
+        }
+        
+        for (i32 i=0; i<12; i++) {
+            auto &code=data->keypad_codes[i];
+            game_state->textureShader.Uniform1i("_texture",GetTexture("res/imgs/dinner_tiles.png"));
+            i32 x_dest = (NATIVE_GAME_WIDTH - 12*16)/2 + i*16;
+            iRect dest = {x_dest,48,16,16};
+            GL_DrawTexture({0,64,16,16},dest);
+
+            // up and down arrows
+            iRect up_arrow_src = {112,96,16,8};
+            iRect down_arrow_src = {112,96,16,8};
+            iRect up_arrow_dest = {dest.x,dest.y-10,16,8};
+            iRect down_arrow_dest = {dest.x,dest.y+dest.h+2,16,8};
+
+            bool generate_new_texture=false;
+            
+            v2i mpos = GetMousePositionIngame();
+            if (rect_contains_point(up_arrow_dest,mpos)) {
+                up_arrow_src.y += 8;
+                if (input->mouse_just_pressed) {
+                    data->digit_clicked = i;
+                    data->digit_click_direction = 1;
+                    generate_new_texture=true;
+                }
+            }
+            if (rect_contains_point(down_arrow_dest,mpos)) {
+                down_arrow_src.y += 8;
+                if (input->mouse_just_pressed) {
+                    data->digit_clicked = i;
+                    data->digit_click_direction = -1;
+                    generate_new_texture=true;
+                }
+            }
+
+            if (data->digit_clicked == i) {
+                if (data->digit_click_direction == 1) {
+                    up_arrow_src.y = 112;
+                } else {
+                    down_arrow_src.y = 112;
+                }
+            }
+
+            GL_DrawTexture(up_arrow_src,up_arrow_dest);
+            GL_DrawTexture(down_arrow_src,down_arrow_dest,false,true);
+
+            if (generate_new_texture) {
+                i32 new_num = data->code_values[i] + data->digit_click_direction;
+                if (new_num >= 10) {
+                    new_num = 0;
+                } else if (new_num < 0) {
+                    new_num = 9;
+                }
+                data->code_values[i] = new_num;
+                code = generate_text_obj(game_state->font,std::to_string(new_num),COLOR_BLACK,code.gl_texture);
+                code.position.x = dest.x+8-(code.get_draw_rect().w/2);
+                code.position.y = 48;
+            }
+
+
+            game_state->textureShader.Uniform1i("_texture",code.gl_texture);
+            GL_DrawTexture({0,0,0,0},code.get_draw_rect());
+        }
+        
     } else if (data->gameplay_state == GmDinnerData::MILKSHAKE_SELECT) {
         
         UseShader(&game_state->colorShader);
